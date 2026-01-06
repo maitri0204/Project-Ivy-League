@@ -2,11 +2,13 @@ import express, { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
 import ivyServiceRoutes from './routes/ivyService.routes';
 import userRoutes from './routes/user.routes';
 import excelUploadRoutes from './routes/excelUpload.routes';
 import studentInterestRoutes from './routes/studentInterest.routes';
 import agentSuggestionRoutes from './routes/agentSuggestion.routes';
+import pointer5Routes from './routes/pointer5.routes';
 
 dotenv.config();
 
@@ -15,6 +17,10 @@ const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json()); // Parse JSON bodies
+app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Basic test route
 app.get('/', (_req: Request, res: Response) => {
@@ -27,6 +33,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/excel-upload', excelUploadRoutes);
 app.use('/api/student-interest', studentInterestRoutes);
 app.use('/api/agent-suggestions', agentSuggestionRoutes);
+app.use('/api/pointer5', pointer5Routes);
 
 // Connect to MongoDB and start server
 const startServer = async () => {
