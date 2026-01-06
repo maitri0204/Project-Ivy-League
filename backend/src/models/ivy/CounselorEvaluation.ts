@@ -1,0 +1,21 @@
+import mongoose, { Document, Schema } from 'mongoose';
+import { PointerNo } from '../../types/PointerNo';
+
+export interface ICounselorEvaluation extends Document {
+  studentSubmissionId: mongoose.Types.ObjectId;
+  pointerNo: PointerNo;
+  score: number;
+  feedback?: string;
+  evaluatedAt?: Date;
+}
+
+const counselorEvaluationSchema = new Schema<ICounselorEvaluation>({
+  studentSubmissionId: { type: Schema.Types.ObjectId, ref: 'StudentSubmission', required: true },
+  pointerNo: { type: Number, enum: Object.values(PointerNo), required: true },
+  score: { type: Number, required: true },
+  feedback: { type: String },
+  evaluatedAt: { type: Date, default: Date.now },
+});
+
+export default mongoose.model<ICounselorEvaluation>('CounselorEvaluation', counselorEvaluationSchema);
+
