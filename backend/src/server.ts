@@ -10,6 +10,7 @@ import studentInterestRoutes from './routes/studentInterest.routes';
 import agentSuggestionRoutes from './routes/agentSuggestion.routes';
 import pointer5Routes from './routes/pointer5.routes';
 import pointer6Routes from './routes/pointer6.routes';
+import pointer234ActivityRoutes from './routes/pointer234Activity.routes';
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ app.use('/api/student-interest', studentInterestRoutes);
 app.use('/api/agent-suggestions', agentSuggestionRoutes);
 app.use('/api/pointer5', pointer5Routes);
 app.use('/api/pointer6', pointer6Routes);
+app.use('/api/pointer', pointer234ActivityRoutes);
 
 // Connect to MongoDB and start server
 const startServer = async () => {
