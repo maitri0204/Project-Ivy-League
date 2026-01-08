@@ -15,11 +15,15 @@ export interface IStudentIvyScoreCard extends Document {
 }
 
 const pointerScoreSchema = new Schema<PointerScore>({
+<<<<<<< HEAD
   pointerNo: {
     type: Number,
     enum: Object.values(PointerNo).filter((v) => typeof v === 'number'),
     required: true,
   },
+=======
+  pointerNo: { type: Number, enum: Object.values(PointerNo).filter(v => typeof v === 'number') as number[], required: true },
+>>>>>>> b2960f9b4d97283f403a2bc5fd6f3cf5c65d2e9e
   score: { type: Number, required: true },
   maxScore: { type: Number, required: true },
 }, { _id : false });
