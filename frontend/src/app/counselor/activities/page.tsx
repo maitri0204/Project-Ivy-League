@@ -480,6 +480,27 @@ function ActivitiesContent() {
         {/* Evaluate Proofs Tab */}
         {activeTab === 'evaluate' && (
           <div className="space-y-6">
+            {/* Pointer Selection Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              {[2, 3, 4].map((pointerNo) => (
+                <button
+                  key={pointerNo}
+                  onClick={() => setSelectedPointer(pointerNo)}
+                  className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 transition-all ${selectedPointer === pointerNo
+                    ? 'border-blue-600 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                >
+                  <span className="text-lg font-bold mb-1">Pointer {pointerNo}</span>
+                  <span className="text-sm text-center">
+                    {pointerNo === 2 && 'Spike in One Area'}
+                    {pointerNo === 3 && 'Leadership & Initiative'}
+                    {pointerNo === 4 && 'Global & Social Impact'}
+                  </span>
+                </button>
+              ))}
+            </div>
+
             <div className="flex justify-end">
               <button
                 onClick={fetchStudentActivities}
@@ -494,76 +515,78 @@ function ActivitiesContent() {
               <div className="text-center py-8">
                 <div className="text-gray-500">Loading activities...</div>
               </div>
-            ) : studentActivities.length === 0 ? (
+            ) : studentActivities.filter(a => a.pointerNo === selectedPointer).length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                <p>No activities assigned yet. Select activities from the "Select Activities" tab.</p>
+                <p>No activities assigned for {getPointerLabel(selectedPointer as number)} yet.</p>
               </div>
             ) : (
               <div className="space-y-6">
-                {studentActivities.map((activity) => (
-                  <div
-                    key={activity.selectionId}
-                    className="border border-gray-200 rounded-lg p-6"
-                  >
-                    <div className="mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">{activity.title}</h3>
-                      <p className="text-sm text-gray-500 mb-2">
-                        {getPointerLabel(activity.pointerNo)}
-                      </p>
-                      <p className="text-gray-700 whitespace-pre-wrap mb-4">
-                        {activity.description}
-                      </p>
-                    </div>
-
-                    {activity.proofUploaded ? (
-                      <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
-                        <p className="text-sm font-medium text-blue-900 mb-2">Proof Submitted</p>
-                        <p className="text-xs text-blue-700 mb-3">
-                          Submitted: {new Date(activity.submission!.submittedAt).toLocaleString()}
+                {studentActivities
+                  .filter(activity => activity.pointerNo === selectedPointer)
+                  .map((activity) => (
+                    <div
+                      key={activity.selectionId}
+                      className="border border-gray-200 rounded-lg p-6"
+                    >
+                      <div className="mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">{activity.title}</h3>
+                        <p className="text-sm text-gray-500 mb-2">
+                          {getPointerLabel(activity.pointerNo)}
                         </p>
-                        <div className="space-y-2">
-                          {activity.submission!.files.map((fileUrl, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <a
-                                href={`http://localhost:5000${fileUrl}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 text-sm underline"
-                              >
-                                View Proof {index + 1}
-                              </a>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-                        <p className="text-sm text-yellow-800">Waiting for student to upload proof...</p>
-                      </div>
-                    )}
-
-                    {activity.evaluated ? (
-                      <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-                        <p className="text-sm font-medium text-green-900 mb-1">
-                          Score: {activity.evaluation!.score}/10
+                        <p className="text-gray-700 whitespace-pre-wrap mb-4">
+                          {activity.description}
                         </p>
-                        {activity.evaluation!.feedback && (
-                          <p className="text-sm text-green-800 whitespace-pre-wrap">
-                            {activity.evaluation!.feedback}
+                      </div>
+
+                      {activity.proofUploaded ? (
+                        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
+                          <p className="text-sm font-medium text-blue-900 mb-2">Proof Submitted</p>
+                          <p className="text-xs text-blue-700 mb-3">
+                            Submitted: {new Date(activity.submission!.submittedAt).toLocaleString()}
                           </p>
-                        )}
-                        <p className="text-xs text-green-700 mt-2">
-                          Evaluated: {new Date(activity.evaluation!.evaluatedAt).toLocaleString()}
-                        </p>
-                      </div>
-                    ) : activity.proofUploaded ? (
-                      <ActivityEvaluationForm
-                        submissionId={activity.submission!._id}
-                        onEvaluate={handleEvaluate}
-                      />
-                    ) : null}
-                  </div>
-                ))}
+                          <div className="space-y-2">
+                            {activity.submission!.files.map((fileUrl, index) => (
+                              <div key={index} className="flex items-center gap-2">
+                                <a
+                                  href={`http://localhost:5000${fileUrl}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:text-blue-800 text-sm underline"
+                                >
+                                  View Proof {index + 1}
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                          <p className="text-sm text-yellow-800">Waiting for student to upload proof...</p>
+                        </div>
+                      )}
+
+                      {activity.evaluated ? (
+                        <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                          <p className="text-sm font-medium text-green-900 mb-1">
+                            Score: {activity.evaluation!.score}/10
+                          </p>
+                          {activity.evaluation!.feedback && (
+                            <p className="text-sm text-green-800 whitespace-pre-wrap">
+                              {activity.evaluation!.feedback}
+                            </p>
+                          )}
+                          <p className="text-xs text-green-700 mt-2">
+                            Evaluated: {new Date(activity.evaluation!.evaluatedAt).toLocaleString()}
+                          </p>
+                        </div>
+                      ) : activity.proofUploaded ? (
+                        <ActivityEvaluationForm
+                          submissionId={activity.submission!._id}
+                          onEvaluate={handleEvaluate}
+                        />
+                      ) : null}
+                    </div>
+                  ))}
               </div>
             )}
           </div>
