@@ -11,7 +11,7 @@ export interface IStudentPointerScore extends Document {
 
 const studentPointerScoreSchema = new Schema<IStudentPointerScore>({
   studentIvyServiceId: { type: Schema.Types.ObjectId, ref: 'StudentIvyService', required: true },
-  pointerNo: { type: Number, enum: Object.values(PointerNo), required: true },
+  pointerNo: { type: Number, enum: Object.values(PointerNo).filter((v) => typeof v === 'number'), required: true },
   scoreObtained: { type: Number, required: true },
   maxScore: { type: Number, required: true },
   lastUpdated: { type: Date, default: Date.now },

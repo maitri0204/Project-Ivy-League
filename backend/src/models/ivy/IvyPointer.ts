@@ -9,7 +9,12 @@ export interface IIvyPointer extends Document {
 }
 
 const ivyPointerSchema = new Schema<IIvyPointer>({
-  pointerNo: { type: Number, enum: Object.values(PointerNo), required: true, unique: true },
+  pointerNo: {
+    type: Number,
+    enum: Object.values(PointerNo).filter((v) => typeof v === 'number'),
+    required: true,
+    unique: true,
+  },
   title: { type: String, required: true },
   description: { type: String, required: true },
   maxScore: { type: Number, required: true },
