@@ -12,6 +12,7 @@ import pointer5Routes from './routes/pointer5.routes';
 import pointer6Routes from './routes/pointer6.routes';
 import pointerActivityRoutes from './routes/pointerActivity.routes';
 import pointer234ActivityRoutes from './routes/pointer234Activity.routes';
+import ivyScoreRoutes from './routes/ivyScore.routes';
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ app.use('/api/pointer5', pointer5Routes);
 app.use('/api/pointer6', pointer6Routes);
 app.use('/api/pointer/activity', pointerActivityRoutes);
 app.use('/api/pointer', pointer234ActivityRoutes);
+app.use('/api/ivy-score', ivyScoreRoutes);
 
 // Connect to MongoDB and start server
 const startServer = async () => {

@@ -6,6 +6,8 @@ import {
   evaluatePointer6,
   getPointer6Status,
 } from '../services/pointer6.service';
+import { updateScoreAfterEvaluation } from '../services/ivyScore.service';
+import { PointerNo } from '../types/PointerNo';
 
 // Multer in-memory storage
 const storage = multer.memoryStorage();
@@ -129,6 +131,13 @@ export const evaluatePointer6Handler = async (req: Request, res: Response): Prom
       counselorId as string,
       Number(score),
       feedback,
+    );
+
+    // Update overall Ivy score
+    await updateScoreAfterEvaluation(
+      evaluation.studentIvyServiceId.toString(),
+      PointerNo.IntellectualCuriosity,
+      evaluation.score
     );
 
     res.status(200).json({

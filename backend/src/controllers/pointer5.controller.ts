@@ -5,6 +5,8 @@ import {
   evaluateEssay,
   getPointer5Status,
 } from '../services/pointer5.service';
+import { updateScoreAfterEvaluation } from '../services/ivyScore.service';
+import { PointerNo } from '../types/PointerNo';
 import multer from 'multer';
 import path from 'path';
 
@@ -162,6 +164,13 @@ export const evaluateEssayHandler = async (req: Request, res: Response): Promise
 
     const evaluation = await evaluateEssay(essaySubmissionId, counselorId, score, feedback);
 
+    // Update overall Ivy score
+    await updateScoreAfterEvaluation(
+      evaluation.studentIvyServiceId.toString(),
+      PointerNo.AuthenticStorytelling,
+      evaluation.score
+    );
+
     res.status(200).json({
       success: true,
       message: 'Essay evaluated successfully',
@@ -230,7 +239,7 @@ export const serveFileHandler = async (req: Request, res: Response): Promise<voi
     // Remove any leading slashes and normalize
     let safePath = filePath.replace(/^\/+/, ''); // Remove leading slashes
     safePath = path.normalize(safePath).replace(/^(\.\.[\/\\])+/, ''); // Prevent ../
-    
+
     // Ensure path is within uploads directory
     if (!safePath.startsWith('uploads/pointer5')) {
       res.status(403).json({
