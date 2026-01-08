@@ -12,12 +12,8 @@ export interface ICounselorSelectedSuggestion extends Document {
 const counselorSelectedSuggestionSchema = new Schema<ICounselorSelectedSuggestion>({
   studentIvyServiceId: { type: Schema.Types.ObjectId, ref: 'StudentIvyService', required: true },
   agentSuggestionId: { type: Schema.Types.ObjectId, ref: 'AgentSuggestion', required: true },
-<<<<<<< HEAD
   // Restrict enum to numeric PointerNo values only to avoid string variants from TS enums
-  pointerNo: { type: Number, enum: Object.values(PointerNo).filter((v) => typeof v === 'number'), required: true },
-=======
   pointerNo: { type: Number, enum: Object.values(PointerNo).filter(v => typeof v === 'number') as number[], required: true },
->>>>>>> b2960f9b4d97283f403a2bc5fd6f3cf5c65d2e9e
   isVisibleToStudent: { type: Boolean, default: false, required: true },
   selectedAt: { type: Date, default: Date.now },
 });
