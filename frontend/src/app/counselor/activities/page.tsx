@@ -13,8 +13,8 @@ interface AgentSuggestion {
 }
 
 interface StudentActivity {
-  selectedActivityId: string;
-  agentSuggestionId: string;
+  selectionId: string;
+  suggestion?: AgentSuggestion;
   pointerNo: number;
   title: string;
   description: string;
@@ -39,7 +39,7 @@ interface StudentActivity {
 function ActivitiesContent() {
   const searchParams = useSearchParams();
   const studentIvyServiceId = searchParams.get('studentIvyServiceId');
-  const counselorId = searchParams.get('counselorId') || '1'; // TODO: Get from auth
+  const counselorId = searchParams.get('counselorId') || '695b93a44df1114a001dc23d';
 
   const [studentInterest, setStudentInterest] = useState<string>('');
   const [selectedPointer, setSelectedPointer] = useState<number | ''>(2);
@@ -52,7 +52,6 @@ function ActivitiesContent() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'suggestions' | 'evaluate'>('suggestions');
 
-  // Function to fetch student activities
   const fetchStudentActivities = async () => {
     const studentId = searchParams.get('studentId');
     if (!studentId) return;
@@ -63,7 +62,17 @@ function ActivitiesContent() {
         `http://localhost:5000/api/pointer/activity/student/${studentId}`
       );
       if (response.data.success) {
-        setStudentActivities(response.data.data);
+        const payload = response.data.data;
+        const rawActivities = payload && Array.isArray(payload.activities) ? payload.activities : [];
+
+        const activitiesData = rawActivities.map((act: any) => ({
+          ...act,
+          title: act.suggestion?.title || 'Untitled Activity',
+          description: act.suggestion?.description || '',
+          tags: act.suggestion?.tags || []
+        }));
+
+        setStudentActivities(activitiesData);
       }
     } catch (error: any) {
       console.error('Error fetching student activities:', error);
@@ -72,13 +81,56 @@ function ActivitiesContent() {
     }
   };
 
-  // Fetch student activities on mount and when tab changes to evaluate
   useEffect(() => {
     if (!studentIvyServiceId) return;
     if (activeTab === 'evaluate') {
       fetchStudentActivities();
     }
   }, [studentIvyServiceId, searchParams, activeTab]);
+
+  useEffect(() => {
+    if (!studentIvyServiceId) return;
+
+    const initData = async () => {
+      setLoadingActivities(true);
+      try {
+        const serviceResponse = await axios.get(`http://localhost:5000/api/ivy-service/${studentIvyServiceId}`);
+        if (serviceResponse.data.success && serviceResponse.data.data.studentInterest) {
+          setStudentInterest(serviceResponse.data.data.studentInterest);
+        }
+
+        const studentId = searchParams.get('studentId');
+        if (studentId) {
+          const activitiesResponse = await axios.get(`http://localhost:5000/api/pointer/activity/student/${studentId}`);
+          if (activitiesResponse.data.success) {
+            const payload = activitiesResponse.data.data;
+            const rawActivities = payload && Array.isArray(payload.activities) ? payload.activities : [];
+
+            const activitiesData = rawActivities.map((act: any) => ({
+              ...act,
+              title: act.suggestion?.title || 'Untitled Activity',
+              description: act.suggestion?.description || '',
+              tags: act.suggestion?.tags || []
+            }));
+
+            setStudentActivities(activitiesData);
+
+            const assignedIds = new Set<string>();
+            activitiesData.forEach((act: StudentActivity) => {
+              if (act.suggestion?._id) assignedIds.add(act.suggestion._id);
+            });
+            setSelectedActivities(assignedIds);
+          }
+        }
+      } catch (error) {
+        console.error("Error initializing data:", error);
+      } finally {
+        setLoadingActivities(false);
+      }
+    };
+
+    initData();
+  }, [studentIvyServiceId, searchParams]);
 
   const handleFetchSuggestions = async () => {
     if (!studentInterest.trim()) {
@@ -93,9 +145,12 @@ function ActivitiesContent() {
 
     setLoading(true);
     setMessage(null);
-    setSelectedActivities(new Set());
 
     try {
+      await axios.put(`http://localhost:5000/api/ivy-service/${studentIvyServiceId}/interest`, {
+        interest: studentInterest.trim()
+      });
+
       const response = await axios.get<AgentSuggestion[]>(
         `http://localhost:5000/api/agent-suggestions`,
         {
@@ -124,6 +179,14 @@ function ActivitiesContent() {
     }
   };
 
+  // Auto-fetch suggestions logic
+  useEffect(() => {
+    if (studentInterest && selectedPointer && !loading) {
+      handleFetchSuggestions();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPointer, studentInterest]);
+
   const handleToggleActivity = (activityId: string) => {
     const newSelected = new Set(selectedActivities);
     if (newSelected.has(activityId)) {
@@ -135,8 +198,12 @@ function ActivitiesContent() {
   };
 
   const handleSelectActivities = async () => {
-    if (selectedActivities.size === 0) {
-      setMessage({ type: 'error', text: 'Please select at least one activity' });
+    // Filter selected activities to only include those in the current suggestions (current pointer)
+    const currentPointerSuggestionIds = new Set(suggestions.map(s => s._id));
+    const idsToSubmit = Array.from(selectedActivities).filter(id => currentPointerSuggestionIds.has(id));
+
+    if (idsToSubmit.length === 0) {
+      setMessage({ type: 'error', text: 'Please select at least one activity for this pointer' });
       return;
     }
 
@@ -157,14 +224,12 @@ function ActivitiesContent() {
       const response = await axios.post('http://localhost:5000/api/pointer/activity/select', {
         studentIvyServiceId,
         counselorId,
-        agentSuggestionIds: Array.from(selectedActivities),
+        agentSuggestionIds: idsToSubmit,
         pointerNo: selectedPointer,
       });
 
       if (response.data.success) {
         setMessage({ type: 'success', text: 'Activities selected successfully!' });
-        setSelectedActivities(new Set());
-        // Refresh student activities after a short delay
         setTimeout(() => {
           fetchStudentActivities();
         }, 500);
@@ -194,7 +259,6 @@ function ActivitiesContent() {
 
       if (response.data.success) {
         setMessage({ type: 'success', text: 'Activity evaluated successfully!' });
-        // Refresh student activities after a short delay
         setTimeout(() => {
           fetchStudentActivities();
         }, 500);
@@ -230,6 +294,9 @@ function ActivitiesContent() {
     );
   }
 
+  // Calculate distinct selection count for the current pointer
+  const currentPointerSelectionCount = suggestions.filter(s => selectedActivities.has(s._id)).length;
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-md p-8">
@@ -239,21 +306,19 @@ function ActivitiesContent() {
         <div className="flex space-x-4 mb-6 border-b border-gray-200">
           <button
             onClick={() => setActiveTab('suggestions')}
-            className={`px-4 py-2 font-medium ${
-              activeTab === 'suggestions'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
+            className={`px-4 py-2 font-medium ${activeTab === 'suggestions'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-600 hover:text-gray-900'
+              }`}
           >
             Select Activities
           </button>
           <button
             onClick={() => setActiveTab('evaluate')}
-            className={`px-4 py-2 font-medium ${
-              activeTab === 'evaluate'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
+            className={`px-4 py-2 font-medium ${activeTab === 'evaluate'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-600 hover:text-gray-900'
+              }`}
           >
             Evaluate Proofs
           </button>
@@ -262,11 +327,10 @@ function ActivitiesContent() {
         {/* Messages */}
         {message && (
           <div
-            className={`mb-6 p-4 rounded-md ${
-              message.type === 'success'
-                ? 'bg-green-50 text-green-800 border border-green-200'
-                : 'bg-red-50 text-red-800 border border-red-200'
-            }`}
+            className={`mb-6 p-4 rounded-md ${message.type === 'success'
+              ? 'bg-green-50 text-green-800 border border-green-200'
+              : 'bg-red-50 text-red-800 border border-red-200'
+              }`}
           >
             {message.text}
           </div>
@@ -275,128 +339,139 @@ function ActivitiesContent() {
         {/* Select Activities Tab */}
         {activeTab === 'suggestions' && (
           <div className="space-y-6">
+            {/* Pointer Selection Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              {[2, 3, 4].map((pointerNo) => (
+                <button
+                  key={pointerNo}
+                  onClick={() => setSelectedPointer(pointerNo)}
+                  className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 transition-all ${selectedPointer === pointerNo
+                    ? 'border-blue-600 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                >
+                  <span className="text-lg font-bold mb-1">Pointer {pointerNo}</span>
+                  <span className="text-sm text-center">
+                    {pointerNo === 2 && 'Spike in One Area'}
+                    {pointerNo === 3 && 'Leadership & Initiative'}
+                    {pointerNo === 4 && 'Global & Social Impact'}
+                  </span>
+                </button>
+              ))}
+            </div>
+
             {/* Student Interest Input */}
-            <div>
+            <div className="mb-6">
               <label
                 htmlFor="studentInterest"
                 className="block text-sm font-medium text-gray-700 mb-2"
               >
-                Student Interest
+                Student Interest for {getPointerLabel(selectedPointer as number)}
               </label>
-              <textarea
-                id="studentInterest"
-                value={studentInterest}
-                onChange={(e) => setStudentInterest(e.target.value)}
-                rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white resize-y"
-                placeholder="Enter student's primary interest here..."
-              />
+              <div className="flex gap-2">
+                <textarea
+                  id="studentInterest"
+                  value={studentInterest}
+                  onChange={(e) => setStudentInterest(e.target.value)}
+                  rows={3}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white resize-y"
+                  placeholder="Enter specific interest for this pointer (e.g., 'Robotics', 'Debate')..."
+                />
+                <button
+                  onClick={handleFetchSuggestions}
+                  disabled={loading || !studentInterest.trim()}
+                  className="self-start px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed h-[86px]"
+                >
+                  {loading ? '...' : 'Save & Get Suggestions'}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                * Updating the interest here will save it for this student. Use "Get Suggestions" to refresh the list below.
+              </p>
             </div>
 
-            {/* Pointer Selection */}
-            <div>
-              <label
-                htmlFor="pointer"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Select Pointer
-              </label>
-              <select
-                id="pointer"
-                value={selectedPointer}
-                onChange={(e) => setSelectedPointer(e.target.value ? parseInt(e.target.value, 10) : '')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-              >
-                <option value="">-- Select Pointer --</option>
-                <option value="2">Pointer 2: Spike in One Area</option>
-                <option value="3">Pointer 3: Leadership & Initiative</option>
-                <option value="4">Pointer 4: Global & Social Impact</option>
-              </select>
-            </div>
-
-            {/* Fetch Button */}
-            <div>
-              <button
-                type="button"
-                onClick={handleFetchSuggestions}
-                disabled={loading || !studentInterest.trim() || !selectedPointer}
-                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading ? 'Fetching Suggestions...' : 'Get Suggestions'}
-              </button>
-            </div>
-
-            {/* Suggestions List */}
-            {!loading && suggestions.length > 0 && (
+            {/* Suggestions Render Logic */}
+            {selectedPointer && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    {getPointerLabel(selectedPointer as number)} - Suitable Activities
-                  </h2>
-                  <span className="text-sm text-gray-500">
-                    {suggestions.length} activit{suggestions.length !== 1 ? 'ies' : 'y'}
-                    {selectedActivities.size > 0 && ` • ${selectedActivities.size} selected`}
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  {suggestions.map((suggestion) => (
-                    <div
-                      key={suggestion._id}
-                      className={`border rounded-lg p-4 transition-all ${
-                        selectedActivities.has(suggestion._id)
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 bg-white hover:shadow-md'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          id={`activity-${suggestion._id}`}
-                          checked={selectedActivities.has(suggestion._id)}
-                          onChange={() => handleToggleActivity(suggestion._id)}
-                          className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <div className="flex-1">
-                          <label
-                            htmlFor={`activity-${suggestion._id}`}
-                            className="cursor-pointer"
-                          >
-                            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                              {suggestion.title}
-                            </h3>
-                            <p className="text-gray-700 mb-3 whitespace-pre-wrap">
-                              {suggestion.description}
-                            </p>
-                            {suggestion.tags && suggestion.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-2">
-                                {suggestion.tags.map((tag, tagIndex) => (
-                                  <span
-                                    key={tagIndex}
-                                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
-                                  >
-                                    {tag}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </label>
-                        </div>
-                      </div>
+                {loading ? (
+                  <div className="text-center py-8 text-gray-500">
+                    Loading suggestions...
+                  </div>
+                ) : suggestions.length > 0 ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-lg font-semibold text-gray-900">
+                        {getPointerLabel(selectedPointer as number)} - Suitable Activities
+                      </h2>
+                      <span className="text-sm text-gray-500">
+                        {suggestions.length} activit{suggestions.length !== 1 ? 'ies' : 'y'}
+                        {currentPointerSelectionCount > 0 && ` • ${currentPointerSelectionCount} selected`}
+                      </span>
                     </div>
-                  ))}
-                </div>
 
-                {/* Select Button */}
-                {selectedActivities.size > 0 && (
-                  <button
-                    onClick={handleSelectActivities}
-                    disabled={selectingActivities}
-                    className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {selectingActivities ? 'Selecting...' : `Select ${selectedActivities.size} Activity(ies)`}
-                  </button>
-                )}
+                    <div className="space-y-3">
+                      {suggestions.map((suggestion) => (
+                        <div
+                          key={suggestion._id}
+                          className={`border rounded-lg p-4 transition-all ${selectedActivities.has(suggestion._id)
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 bg-white hover:shadow-md'
+                            }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              id={`activity-${suggestion._id}`}
+                              checked={selectedActivities.has(suggestion._id)}
+                              onChange={() => handleToggleActivity(suggestion._id)}
+                              className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                            <div className="flex-1">
+                              <label
+                                htmlFor={`activity-${suggestion._id}`}
+                                className="cursor-pointer"
+                              >
+                                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                                  {suggestion.title}
+                                </h3>
+                                <p className="text-gray-700 mb-3 whitespace-pre-wrap">
+                                  {suggestion.description}
+                                </p>
+                                {suggestion.tags && suggestion.tags.length > 0 && (
+                                  <div className="flex flex-wrap gap-2">
+                                    {suggestion.tags.map((tag, tagIndex) => (
+                                      <span
+                                        key={tagIndex}
+                                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                                      >
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Select Button */}
+                    {currentPointerSelectionCount > 0 && (
+                      <button
+                        onClick={handleSelectActivities}
+                        disabled={selectingActivities}
+                        className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {selectingActivities ? 'Selecting...' : `Select ${currentPointerSelectionCount} Activity(ies)`}
+                      </button>
+                    )}
+                  </div>
+                ) : studentInterest ? (
+                  <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                    No suggestions found. Try a different interest keyword or ensure database has activities for this pointer.
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
@@ -405,7 +480,6 @@ function ActivitiesContent() {
         {/* Evaluate Proofs Tab */}
         {activeTab === 'evaluate' && (
           <div className="space-y-6">
-            {/* Refresh Button */}
             <div className="flex justify-end">
               <button
                 onClick={fetchStudentActivities}
@@ -415,7 +489,7 @@ function ActivitiesContent() {
                 {loadingActivities ? 'Refreshing...' : 'Refresh Activities'}
               </button>
             </div>
-            
+
             {loadingActivities ? (
               <div className="text-center py-8">
                 <div className="text-gray-500">Loading activities...</div>
@@ -428,7 +502,7 @@ function ActivitiesContent() {
               <div className="space-y-6">
                 {studentActivities.map((activity) => (
                   <div
-                    key={activity.selectedActivityId}
+                    key={activity.selectionId}
                     className="border border-gray-200 rounded-lg p-6"
                   >
                     <div className="mb-4">
@@ -441,7 +515,6 @@ function ActivitiesContent() {
                       </p>
                     </div>
 
-                    {/* Proof Status */}
                     {activity.proofUploaded ? (
                       <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
                         <p className="text-sm font-medium text-blue-900 mb-2">Proof Submitted</p>
@@ -469,7 +542,6 @@ function ActivitiesContent() {
                       </div>
                     )}
 
-                    {/* Evaluation */}
                     {activity.evaluated ? (
                       <div className="p-4 bg-green-50 border border-green-200 rounded-md">
                         <p className="text-sm font-medium text-green-900 mb-1">
@@ -554,4 +626,3 @@ export default function ActivitiesPage() {
     </Suspense>
   );
 }
-

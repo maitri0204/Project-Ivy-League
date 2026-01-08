@@ -5,8 +5,8 @@ import axios from 'axios';
 import { useSearchParams } from 'next/navigation';
 
 interface StudentActivity {
-  selectedActivityId: string;
-  agentSuggestionId: string;
+  selectionId: string;
+  suggestion?: { _id: string; title: string; description: string; tags: string[] };
   pointerNo: number;
   title: string;
   description: string;
@@ -37,6 +37,7 @@ function ActivitiesContent() {
   const [loading, setLoading] = useState<boolean>(false);
   const [uploadingProof, setUploadingProof] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [activePointer, setActivePointer] = useState<number>(2);
 
   useEffect(() => {
     if (!studentId) {
@@ -51,7 +52,18 @@ function ActivitiesContent() {
           `http://localhost:5000/api/pointer/activity/student/${studentId}`
         );
         if (response.data.success) {
-          setActivities(response.data.data);
+          // API returns { data: { activities: [...] } }
+          const payload = response.data.data;
+          const rawActivities = payload && Array.isArray(payload.activities) ? payload.activities : [];
+
+          const activitiesData = rawActivities.map((act: any) => ({
+            ...act,
+            title: act.suggestion?.title || 'Untitled Activity',
+            description: act.suggestion?.description || '',
+            tags: act.suggestion?.tags || []
+          }));
+
+          setActivities(activitiesData);
         }
       } catch (error: any) {
         console.error('Error fetching activities:', error);
@@ -113,11 +125,18 @@ function ActivitiesContent() {
               `http://localhost:5000/api/pointer/activity/student/${studentId}`
             );
             if (refreshResponse.data.success) {
-              setActivities(refreshResponse.data.data);
+              const payload = refreshResponse.data.data;
+              const rawActivities = payload && Array.isArray(payload.activities) ? payload.activities : [];
+              const activitiesData = rawActivities.map((act: any) => ({
+                ...act,
+                title: act.suggestion?.title || 'Untitled Activity',
+                description: act.suggestion?.description || '',
+                tags: act.suggestion?.tags || []
+              }));
+              setActivities(activitiesData);
             }
           } catch (error) {
             console.error('Error refreshing activities:', error);
-            // Fallback to page reload if refetch fails
             window.location.reload();
           }
         }, 500);
@@ -155,19 +174,41 @@ function ActivitiesContent() {
     );
   }
 
+  const filteredActivities = activities.filter(a => a.pointerNo === activePointer);
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-8">
+      <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-md p-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">My Activities</h1>
+
+        {/* Pointer Selection Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {[2, 3, 4].map((pointerNo) => (
+            <button
+              key={pointerNo}
+              onClick={() => setActivePointer(pointerNo)}
+              className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 transition-all ${activePointer === pointerNo
+                  ? 'border-blue-600 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                }`}
+            >
+              <span className="text-lg font-bold mb-1">Pointer {pointerNo}</span>
+              <span className="text-sm text-center">
+                {pointerNo === 2 && 'Spike in One Area'}
+                {pointerNo === 3 && 'Leadership & Initiative'}
+                {pointerNo === 4 && 'Global & Social Impact'}
+              </span>
+            </button>
+          ))}
+        </div>
 
         {/* Messages */}
         {message && (
           <div
-            className={`mb-6 p-4 rounded-md ${
-              message.type === 'success'
-                ? 'bg-green-50 text-green-800 border border-green-200'
-                : 'bg-red-50 text-red-800 border border-red-200'
-            }`}
+            className={`mb-6 p-4 rounded-md ${message.type === 'success'
+              ? 'bg-green-50 text-green-800 border border-green-200'
+              : 'bg-red-50 text-red-800 border border-red-200'
+              }`}
           >
             {message.text}
           </div>
@@ -177,15 +218,15 @@ function ActivitiesContent() {
           <div className="text-center py-8">
             <div className="text-gray-500">Loading activities...</div>
           </div>
-        ) : activities.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p>No activities assigned yet. Your counselor will assign activities for you.</p>
+        ) : filteredActivities.length === 0 ? (
+          <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+            <p>No activities assigned for {getPointerLabel(activePointer)} yet.</p>
           </div>
         ) : (
           <div className="space-y-6">
-            {activities.map((activity) => (
+            {filteredActivities.map((activity) => (
               <div
-                key={activity.selectedActivityId}
+                key={activity.selectionId}
                 className="border border-gray-200 rounded-lg p-6"
               >
                 <div className="mb-4">
@@ -238,14 +279,14 @@ function ActivitiesContent() {
                         input.multiple = true;
                         input.accept = '.pdf,.jpg,.jpeg,.png,.doc,.docx';
                         input.onchange = (e) => {
-                          handleProofUpload(activity.selectedActivityId, e as any);
+                          handleProofUpload(activity.selectionId, e as any);
                         };
                         input.click();
                       }}
-                      disabled={uploadingProof === activity.selectedActivityId}
+                      disabled={uploadingProof === activity.selectionId}
                       className="mt-3 text-sm text-blue-600 hover:text-blue-800 underline disabled:opacity-50"
                     >
-                      {uploadingProof === activity.selectedActivityId
+                      {uploadingProof === activity.selectionId
                         ? 'Uploading...'
                         : 'Replace Proof'}
                     </button>
@@ -259,11 +300,11 @@ function ActivitiesContent() {
                       type="file"
                       multiple
                       accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                      onChange={(e) => handleProofUpload(activity.selectedActivityId, e)}
-                      disabled={uploadingProof === activity.selectedActivityId}
+                      onChange={(e) => handleProofUpload(activity.selectionId, e)}
+                      disabled={uploadingProof === activity.selectionId}
                       className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
                     />
-                    {uploadingProof === activity.selectedActivityId && (
+                    {uploadingProof === activity.selectionId && (
                       <p className="text-xs text-gray-500 mt-2">Uploading...</p>
                     )}
                   </div>
@@ -301,4 +342,3 @@ export default function ActivitiesPage() {
     </Suspense>
   );
 }
-

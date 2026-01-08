@@ -42,3 +42,40 @@ export const createStudentIvyService = async (
   return newService;
 };
 
+export const getStudentsForCounselor = async (counselorId: string) => {
+  if (!mongoose.Types.ObjectId.isValid(counselorId)) {
+    throw new Error('Invalid counselor ID format');
+  }
+
+  const services = await StudentIvyService.find({ counselorId })
+    .populate('studentId', 'name email')
+    .sort({ createdAt: -1 });
+
+  return services;
+};
+
+export const updateStudentInterest = async (serviceId: string, interest: string) => {
+  if (!mongoose.Types.ObjectId.isValid(serviceId)) {
+    throw new Error('Invalid service ID');
+  }
+
+  const service = await StudentIvyService.findByIdAndUpdate(
+    serviceId,
+    { studentInterest: interest },
+    { new: true }
+  );
+
+  if (!service) {
+    throw new Error('Service not found');
+  }
+
+  return service;
+};
+
+export const getStudentIvyServiceById = async (serviceId: string) => {
+  if (!mongoose.Types.ObjectId.isValid(serviceId)) {
+    throw new Error('Invalid service ID');
+  }
+  return await StudentIvyService.findById(serviceId).populate('studentId', 'name email');
+};
+
