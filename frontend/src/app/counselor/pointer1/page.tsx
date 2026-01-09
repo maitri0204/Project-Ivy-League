@@ -5,25 +5,21 @@ import { useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import Link from 'next/link';
 
+interface Evaluation {
+    score: number;
+    feedback: string;
+    evaluatedAt: string;
+}
+
 interface AcademicDoc {
     _id: string;
     documentType: string;
+    customLabel?: string;
     fileUrl: string;
     fileName: string;
     uploadedAt: string;
+    evaluation: Evaluation | null;
 }
-
-const DOCUMENT_GROUPS = {
-    identity: ['BIRTH_CERTIFICATE', 'AADHAR_CARD'],
-    marksheet: [
-        'MARKSHEET_8',
-        'MARKSHEET_9',
-        'MARKSHEET_10',
-        'MARKSHEET_11',
-        'MARKSHEET_12',
-        'UNIVERSITY_MARKSHEET'
-    ]
-};
 
 const DOC_LABELS: Record<string, string> = {
     BIRTH_CERTIFICATE: 'Birth Certificate',
@@ -36,18 +32,84 @@ const DOC_LABELS: Record<string, string> = {
     UNIVERSITY_MARKSHEET: 'University Marksheet',
 };
 
+function EvaluationForm({ doc, studentIvyServiceId, counselorId, onSave }: { doc: AcademicDoc, studentIvyServiceId: string, counselorId: string, onSave: () => void }) {
+    const [score, setScore] = useState(doc.evaluation?.score.toString() || '');
+    const [feedback, setFeedback] = useState(doc.evaluation?.feedback || '');
+    const [submitting, setSubmitting] = useState(false);
+    const [msg, setMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+    const handleSave = async () => {
+        const s = parseFloat(score);
+        if (isNaN(s) || s < 0 || s > 10) {
+            setMsg({ type: 'error', text: 'Score 0-10 required' });
+            return;
+        }
+        setSubmitting(true);
+        setMsg(null);
+        try {
+            await axios.post('http://localhost:5000/api/pointer1/evaluate', {
+                studentIvyServiceId,
+                academicDocumentId: doc._id,
+                counselorId,
+                score: s,
+                feedback
+            });
+            setMsg({ type: 'success', text: 'Saved' });
+            onSave();
+        } catch (e: any) {
+            setMsg({ type: 'error', text: 'Error' });
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="mt-4 p-5 bg-gray-50 rounded-2xl border border-gray-100 shadow-inner">
+            <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                    <label className="block text-[10px] font-black tracking-widest text-gray-400 uppercase mb-1">Marksheet Score (0-10)</label>
+                    <input
+                        type="number"
+                        min="0" max="10" step="0.5"
+                        value={score}
+                        onChange={(e) => setScore(e.target.value)}
+                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-indigo-500 outline-none font-bold text-gray-900 transition-all text-lg"
+                        placeholder="0-10"
+                    />
+                </div>
+                <div className="flex-[3]">
+                    <label className="block text-[10px] font-black tracking-widest text-gray-400 uppercase mb-1">Feedback</label>
+                    <input
+                        type="text"
+                        value={feedback}
+                        onChange={(e) => setFeedback(e.target.value)}
+                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-indigo-500 outline-none font-medium text-gray-700 transition-all text-sm"
+                        placeholder="Observations..."
+                    />
+                </div>
+                <div className="flex items-end">
+                    <button
+                        onClick={handleSave}
+                        disabled={submitting}
+                        className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all text-sm h-[52px]"
+                    >
+                        {submitting ? '...' : 'SAVE'}
+                    </button>
+                </div>
+            </div>
+            {msg && <p className={`mt-2 text-xs font-bold ${msg.type === 'success' ? 'text-green-500' : 'text-red-500'}`}>{msg.text}</p>}
+        </div>
+    );
+}
+
 function CounselorPointer1Content() {
     const searchParams = useSearchParams();
     const studentId = searchParams.get('studentId');
     const studentIvyServiceId = searchParams.get('studentIvyServiceId');
     const counselorId = searchParams.get('counselorId') || '695b93a44df1114a001dc23d';
 
-    const [documents, setDocuments] = useState<Record<string, AcademicDoc>>({});
-    const [score, setScore] = useState<string>('');
-    const [feedback, setFeedback] = useState<string>('');
+    const [documents, setDocuments] = useState<AcademicDoc[]>([]);
     const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
-    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     const fetchStatus = async () => {
         if (!studentId) return;
@@ -55,16 +117,7 @@ function CounselorPointer1Content() {
             const response = await axios.get(`http://localhost:5000/api/pointer1/status/${studentId}`, {
                 params: { studentIvyServiceId }
             });
-            const { documents: docs, evaluation } = response.data.data;
-            const docMap: Record<string, AcademicDoc> = {};
-            docs.forEach((d: AcademicDoc) => {
-                docMap[d.documentType] = d;
-            });
-            setDocuments(docMap);
-            if (evaluation) {
-                setScore(evaluation.score.toString());
-                setFeedback(evaluation.feedback || '');
-            }
+            setDocuments(response.data.data.documents);
         } catch (error) {
             console.error('Error fetching status:', error);
         } finally {
@@ -72,141 +125,105 @@ function CounselorPointer1Content() {
         }
     };
 
-    useEffect(() => {
-        fetchStatus();
-    }, [studentId]);
+    useEffect(() => { fetchStatus(); }, [studentId]);
 
-    const handleEvaluate = async () => {
-        const scoreNum = parseFloat(score);
-        if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 10) {
-            setMessage({ type: 'error', text: 'Score must be between 0 and 10' });
-            return;
-        }
+    const identityDocs = documents.filter(d => ['BIRTH_CERTIFICATE', 'AADHAR_CARD'].includes(d.documentType));
+    const schoolMarksheets = documents.filter(d => ['MARKSHEET_8', 'MARKSHEET_9', 'MARKSHEET_10', 'MARKSHEET_11', 'MARKSHEET_12'].includes(d.documentType));
+    const uniMarksheets = documents.filter(d => d.documentType === 'UNIVERSITY_MARKSHEET');
 
-        setSubmitting(true);
-        try {
-            await axios.post('http://localhost:5000/api/pointer1/evaluate', {
-                studentIvyServiceId,
-                counselorId,
-                score: scoreNum,
-                feedback
-            });
-            setMessage({ type: 'success', text: 'Evaluation saved successfully!' });
-        } catch (error: any) {
-            setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to save evaluation' });
-        } finally {
-            setSubmitting(false);
-        }
-    };
+    const totalEvaluated = documents.filter(d => d.evaluation).length;
+    const sumScores = documents.reduce((acc, d) => acc + (d.evaluation?.score || 0), 0);
+    const meanScore = totalEvaluated > 0 ? (sumScores / totalEvaluated).toFixed(2) : '0.00';
 
-    if (loading) return <div className="p-8 text-center">Loading student records...</div>;
+    if (loading) return <div className="p-12 text-center text-indigo-400 font-black animate-pulse tracking-widest uppercase">Fetching Records...</div>;
 
-    const renderDocCard = (type: string) => {
-        const doc = documents[type];
-        return (
-            <div key={type} className="bg-white p-4 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm">
+    const renderDocCard = (d: AcademicDoc, isMarksheet: boolean = false) => (
+        <div key={d._id} className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 hover:shadow-xl hover:border-indigo-100 transition-all mb-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
-                    <h4 className="font-semibold text-gray-900">{DOC_LABELS[type]}</h4>
-                    <p className="text-xs text-gray-400 font-mono mt-1">
-                        {doc ? doc.fileName : 'Not Uploaded'}
-                    </p>
+                    <h3 className="text-2xl font-black text-gray-900 tracking-tight uppercase">
+                        {d.documentType === 'UNIVERSITY_MARKSHEET' ? d.customLabel : DOC_LABELS[d.documentType]}
+                    </h3>
+                    <p className="text-gray-400 text-sm font-mono mt-1">{d.fileName}</p>
+                    {d.evaluation && (
+                        <div className="mt-3 inline-flex items-center gap-2 bg-green-50 text-green-600 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider">
+                            <span className="h-1.5 w-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                            Score: {d.evaluation.score}/10
+                        </div>
+                    )}
                 </div>
-                {doc && (
-                    <a
-                        href={`http://localhost:5000${doc.fileUrl}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border border-indigo-100"
-                    >
-                        View Document
-                    </a>
-                )}
+                <a
+                    href={`http://localhost:5000${d.fileUrl}`}
+                    target="_blank"
+                    className="flex items-center gap-2 px-6 py-3 bg-gray-50 text-gray-600 font-bold rounded-2xl hover:bg-indigo-50 hover:text-indigo-600 transition-all border border-transparent hover:border-indigo-100 shadow-inner"
+                >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    VIEW FILE
+                </a>
             </div>
-        );
-    };
+
+            {isMarksheet && studentIvyServiceId && counselorId && (
+                <EvaluationForm
+                    doc={d}
+                    studentIvyServiceId={studentIvyServiceId}
+                    counselorId={counselorId}
+                    onSave={fetchStatus}
+                />
+            )}
+        </div>
+    );
 
     return (
-        <div className="max-w-5xl mx-auto py-10 px-4">
-            <Link
-                href={studentId ? `/counselor/${studentId}?serviceId=${studentIvyServiceId}` : '/counselor'}
-                className="text-indigo-600 hover:bg-white px-4 py-2 rounded-xl transition-all mb-8 inline-block"
-            >
-                ← Back to Student Hub
-            </Link>
+        <div className="min-h-screen bg-gray-50 p-6 md:p-12 font-sans tracking-tight">
+            <div className="max-w-6xl mx-auto">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
+                    <div>
+                        <Link href={`/counselor/${studentId}?serviceId=${studentIvyServiceId}`} className="inline-flex items-center text-indigo-600 font-bold hover:translate-x-[-4px] transition-transform mb-6">
+                            <span className="mr-2 text-xl">←</span> HUB
+                        </Link>
+                        <h1 className="text-6xl font-black text-gray-900 tracking-tighter mb-4">ACADEMIC<br /><span className="text-indigo-600">EXCELLENCE</span></h1>
+                        <p className="text-xl text-gray-400 font-medium max-w-xl">Individual marksheet verification and performance evaluation.</p>
+                    </div>
 
-            <h1 className="text-4xl font-extrabold text-gray-900 mb-2">Academic Excellence Review</h1>
-            <p className="text-gray-500 mb-10">Pointer 1: Verify documents and evaluate academic performance.</p>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Document List */}
-                <div className="lg:col-span-2 space-y-8">
-                    <section>
-                        <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-4 border-blue-500 pl-3">Identity Documents</h2>
-                        <div className="space-y-3">
-                            {DOCUMENT_GROUPS.identity.map(renderDocCard)}
-                        </div>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-4 border-indigo-500 pl-3">Academic Marksheets</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {DOCUMENT_GROUPS.marksheet.map(renderDocCard)}
-                        </div>
-                    </section>
+                    <div className="bg-white p-10 rounded-[3rem] shadow-2xl border-4 border-indigo-50 flex flex-col items-center justify-center text-center scale-110 md:mr-10">
+                        <span className="text-[10px] font-black tracking-[0.3em] text-gray-400 uppercase mb-2">Current Mean Score</span>
+                        <div className="text-7xl font-black text-indigo-600 leading-none">{meanScore}</div>
+                        <span className="text-xs font-bold text-gray-400 mt-2 italic bg-gray-50 px-3 py-1 rounded-full uppercase">Evaluated: {totalEvaluated} docs</span>
+                    </div>
                 </div>
 
-                {/* Evaluation Panel */}
-                <div className="lg:col-span-1">
-                    <div className="bg-white p-8 rounded-3xl shadow-xl border border-gray-100 sticky top-8">
-                        <h3 className="text-2xl font-bold text-gray-900 mb-6">Evaluation</h3>
-
-                        {message && (
-                            <div className={`mb-6 p-4 rounded-xl text-sm font-medium transition-all animate-in fade-in slide-in-from-top-4 ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-                                }`}>
-                                {message.text}
-                            </div>
-                        )}
-
-                        <div className="space-y-6">
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wider">
-                                    Pointer 1 Score (0-10)
-                                </label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    max="10"
-                                    step="0.5"
-                                    value={score}
-                                    onChange={(e) => setScore(e.target.value)}
-                                    placeholder="e.g. 8.5"
-                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all text-xl font-bold text-gray-900"
-                                />
-                                <p className="text-xs text-gray-400 mt-2 font-medium italic">Evaluated based on marksheet performance.</p>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wider">
-                                    Counselor Feedback
-                                </label>
-                                <textarea
-                                    value={feedback}
-                                    onChange={(e) => setFeedback(e.target.value)}
-                                    rows={4}
-                                    placeholder="Provide feedback on academic records..."
-                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all text-gray-900 font-medium"
-                                />
-                            </div>
-
-                            <button
-                                onClick={handleEvaluate}
-                                disabled={submitting}
-                                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold py-4 rounded-2xl shadow-lg shadow-indigo-100 transition-all transform active:scale-95"
-                            >
-                                {submitting ? 'Saving...' : 'Save Evaluation'}
-                            </button>
+                <div className="grid grid-cols-1 gap-16">
+                    <section>
+                        <h2 className="text-3xl font-black text-gray-900 mb-8 flex items-center gap-4">
+                            <span className="h-10 w-2 bg-blue-500 rounded-full"></span>
+                            IDENTITY VERIFICATION
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {identityDocs.map(d => renderDocCard(d))}
+                            {identityDocs.length === 0 && <p className="text-gray-300 font-bold italic py-8 border-2 border-dashed rounded-3xl text-center md:col-span-2">No identity documents available.</p>}
                         </div>
-                    </div>
+                    </section>
+
+                    <section>
+                        <h2 className="text-3xl font-black text-gray-900 mb-8 flex items-center gap-4">
+                            <span className="h-10 w-2 bg-indigo-500 rounded-full"></span>
+                            SCHOOL MARKSHEETS
+                        </h2>
+                        {schoolMarksheets.map(d => renderDocCard(d, true))}
+                        {schoolMarksheets.length === 0 && <p className="text-gray-300 font-bold italic py-12 border-2 border-dashed rounded-3xl text-center">No school marksheets available.</p>}
+                    </section>
+
+                    <section>
+                        <h2 className="text-3xl font-black text-gray-900 mb-8 flex items-center gap-4">
+                            <span className="h-10 w-2 bg-purple-500 rounded-full"></span>
+                            UNIVERSITY RECORDS
+                        </h2>
+                        {uniMarksheets.map(d => renderDocCard(d, true))}
+                        {uniMarksheets.length === 0 && <p className="text-gray-300 font-bold italic py-12 border-2 border-dashed rounded-3xl text-center">No university records available.</p>}
+                    </section>
                 </div>
             </div>
         </div>
@@ -215,10 +232,8 @@ function CounselorPointer1Content() {
 
 export default function CounselorPointer1Page() {
     return (
-        <div className="min-h-screen bg-gray-50">
-            <Suspense fallback={<div className="p-8 text-center text-gray-500 font-medium">Reaching server...</div>}>
-                <CounselorPointer1Content />
-            </Suspense>
-        </div>
+        <Suspense fallback={<div className="p-12 text-center text-gray-300 font-black animate-pulse tracking-[1em] uppercase">Booting Review Suit...</div>}>
+            <CounselorPointer1Content />
+        </Suspense>
     );
 }

@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import multer from 'multer';
 import {
     uploadAcademicDocument,
-    evaluateAcademicExcellence,
+    evaluateAcademicDocument,
     getAcademicStatus,
 } from '../services/pointer1.service';
 import { AcademicDocumentType } from '../types/AcademicDocumentType';
@@ -17,7 +17,9 @@ export const academicUploadMiddleware = upload.single('document');
 
 export const uploadAcademicDocumentHandler = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { studentIvyServiceId, documentType, studentId } = req.body;
+        console.log('[P1-Controller] Body:', req.body);
+        console.log('[P1-Controller] File:', req.file ? req.file.originalname : 'MISSING');
+        const { studentIvyServiceId, documentType, studentId, customLabel } = req.body;
         const file = req.file;
 
         if (!file) {
@@ -40,7 +42,8 @@ export const uploadAcademicDocumentHandler = async (req: Request, res: Response)
             studentIvyServiceId,
             studentId,
             documentType as AcademicDocumentType,
-            file
+            file,
+            customLabel
         );
 
         res.status(200).json({
@@ -55,15 +58,16 @@ export const uploadAcademicDocumentHandler = async (req: Request, res: Response)
 
 export const evaluateAcademicHandler = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { studentIvyServiceId, counselorId, score, feedback } = req.body;
+        const { studentIvyServiceId, academicDocumentId, counselorId, score, feedback } = req.body;
 
-        if (!studentIvyServiceId || !counselorId || score === undefined) {
+        if (!studentIvyServiceId || !academicDocumentId || !counselorId || score === undefined) {
             res.status(400).json({ success: false, message: 'Required fields missing' });
             return;
         }
 
-        const evaluation = await evaluateAcademicExcellence(
+        const evaluation = await evaluateAcademicDocument(
             studentIvyServiceId,
+            academicDocumentId,
             counselorId,
             Number(score),
             feedback

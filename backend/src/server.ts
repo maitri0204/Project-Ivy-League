@@ -44,6 +44,19 @@ app.use('/api/pointer5', pointer5Routes);
 app.use('/api/pointer6', pointer6Routes);
 app.use('/api/pointer/activity', pointerActivityRoutes);
 app.use('/api/ivy-score', ivyScoreRoutes);
+
+// TEMPORARY Maintenance Route
+app.get('/api/maintenance/drop-index', async (req, res) => {
+  try {
+    const db = mongoose.connection.db;
+    if (!db) throw new Error('DB not connected');
+    const indexes = await db.collection('academicdocuments').indexes();
+    res.json({ success: true, indexes });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.use('/api/admin', adminRoutes);
 
 // Connect to MongoDB and start server

@@ -4,6 +4,7 @@ import { AcademicDocumentType } from '../../types/AcademicDocumentType';
 export interface IAcademicDocument extends Document {
     studentIvyServiceId: mongoose.Types.ObjectId;
     documentType: AcademicDocumentType;
+    customLabel?: string;
     fileUrl: string;
     fileName: string;
     fileSize: number;
@@ -14,6 +15,7 @@ export interface IAcademicDocument extends Document {
 const academicDocumentSchema = new Schema<IAcademicDocument>({
     studentIvyServiceId: { type: Schema.Types.ObjectId, ref: 'StudentIvyService', required: true },
     documentType: { type: String, enum: Object.values(AcademicDocumentType), required: true },
+    customLabel: { type: String },
     fileUrl: { type: String, required: true },
     fileName: { type: String, required: true },
     fileSize: { type: Number, required: true },
@@ -21,7 +23,7 @@ const academicDocumentSchema = new Schema<IAcademicDocument>({
     uploadedAt: { type: Date, default: Date.now },
 });
 
-// Ensure only one of each document type per service
-academicDocumentSchema.index({ studentIvyServiceId: 1, documentType: 1 }, { unique: true });
+// Remove unique index to allow multiple uploads for university marksheets
+// academicDocumentSchema.index({ studentIvyServiceId: 1, documentType: 1 }, { unique: true });
 
 export default mongoose.model<IAcademicDocument>('AcademicDocument', academicDocumentSchema);

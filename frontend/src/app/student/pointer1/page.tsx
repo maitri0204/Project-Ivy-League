@@ -8,6 +8,7 @@ import Link from 'next/link';
 interface AcademicDoc {
     _id: string;
     documentType: string;
+    customLabel?: string;
     fileUrl: string;
     fileName: string;
     uploadedAt: string;
@@ -21,7 +22,6 @@ const DOCUMENT_TYPES = [
     { key: 'MARKSHEET_10', label: 'Class 10 Marksheet', description: 'Academic record for 10th grade.' },
     { key: 'MARKSHEET_11', label: 'Class 11 Marksheet', description: 'Academic record for 11th grade.' },
     { key: 'MARKSHEET_12', label: 'Class 12 Marksheet', description: 'Academic record for 12th grade.' },
-    { key: 'UNIVERSITY_MARKSHEET', label: 'University Marksheet', description: 'Latest university or college academic record.' },
 ];
 
 function Pointer1Content() {
@@ -29,9 +29,10 @@ function Pointer1Content() {
     const studentId = searchParams.get('studentId');
     const studentIvyServiceId = searchParams.get('studentIvyServiceId');
 
-    const [documents, setDocuments] = useState<Record<string, AcademicDoc>>({});
+    const [documents, setDocuments] = useState<AcademicDoc[]>([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState<string | null>(null);
+    const [universityLabel, setUniversityLabel] = useState('');
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     const fetchStatus = async () => {
@@ -40,12 +41,7 @@ function Pointer1Content() {
             const response = await axios.get(`http://localhost:5000/api/pointer1/status/${studentId}`, {
                 params: { studentIvyServiceId }
             });
-            const docs = response.data.data.documents;
-            const docMap: Record<string, AcademicDoc> = {};
-            docs.forEach((d: AcademicDoc) => {
-                docMap[d.documentType] = d;
-            });
-            setDocuments(docMap);
+            setDocuments(response.data.data.documents);
         } catch (error) {
             console.error('Error fetching status:', error);
         } finally {
@@ -57,19 +53,25 @@ function Pointer1Content() {
         fetchStatus();
     }, [studentId]);
 
-    const handleFileChange = async (type: string, file: File) => {
+    const handleFileChange = async (type: string, file: File, label?: string) => {
         if (!studentId || !studentIvyServiceId) {
             setMessage({ type: 'error', text: 'Missing student or service information' });
             return;
         }
 
+        if (type === 'UNIVERSITY_MARKSHEET' && !label) {
+            setMessage({ type: 'error', text: 'Please provide a semester name (e.g., Sem 1)' });
+            return;
+        }
+
         const formData = new FormData();
-        formData.append('document', file);
         formData.append('documentType', type);
         formData.append('studentId', studentId);
         formData.append('studentIvyServiceId', studentIvyServiceId);
+        if (label) formData.append('customLabel', label);
+        formData.append('document', file);
 
-        setUploading(type);
+        setUploading(label ? `${type}-${label}` : type);
         setMessage(null);
 
         try {
@@ -77,6 +79,7 @@ function Pointer1Content() {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             setMessage({ type: 'success', text: 'Document uploaded successfully!' });
+            setUniversityLabel('');
             fetchStatus();
         } catch (error: any) {
             setMessage({ type: 'error', text: error.response?.data?.message || 'Upload failed' });
@@ -85,78 +88,143 @@ function Pointer1Content() {
         }
     };
 
-    if (loading) return <div className="p-8 text-center">Loading...</div>;
+    if (loading) return <div className="p-8 text-center text-gray-500 font-medium tracking-wide animate-pulse">Loading academic records...</div>;
+
+    const getExisting = (type: string) => documents.find(d => d.documentType === type);
+    const getUniversityDocs = () => documents.filter(d => d.documentType === 'UNIVERSITY_MARKSHEET');
 
     return (
-        <div className="max-w-4xl mx-auto py-10 px-4">
-            <Link href="/student" className="text-indigo-600 hover:underline mb-6 inline-block">← Back to Dashboard</Link>
+        <div className="max-w-4xl mx-auto py-12 px-6">
+            <Link href="/student" className="group flex items-center text-indigo-600 font-semibold mb-8 transition-all hover:translate-x-1">
+                <span className="mr-2">←</span> Back to Dashboard
+            </Link>
 
-            <header className="mb-10">
-                <h1 className="text-4xl font-extrabold text-gray-900 mb-2">Academic Excellence</h1>
-                <p className="text-lg text-gray-600">Pointer 1: Upload your identity and educational records.</p>
+            <header className="mb-12">
+                <div className="inline-block px-3 py-1 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-full mb-4 tracking-widest uppercase">Pointer 1</div>
+                <h1 className="text-5xl font-black text-gray-900 mb-4 tracking-tight">Academic Excellence</h1>
+                <p className="text-xl text-gray-500 max-w-2xl leading-relaxed">Ensure all your identity proofs and marksheets are uploaded for evaluation.</p>
             </header>
 
             {message && (
-                <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                <div className={`mb-10 p-5 rounded-2xl flex items-center gap-4 animate-in fade-in slide-in-from-top-4 ${message.type === 'success' ? 'bg-green-50 text-green-800 border-l-4 border-green-500' : 'bg-red-50 text-red-800 border-l-4 border-red-500'
                     }`}>
-                    <span className="text-lg">{message.type === 'success' ? '✓' : '⚠'}</span>
-                    <p className="font-medium">{message.text}</p>
+                    <div className={`h-8 w-8 rounded-full flex items-center justify-center ${message.type === 'success' ? 'bg-green-100' : 'bg-red-100'}`}>
+                        <span className="text-lg">{message.type === 'success' ? '✓' : '⚠'}</span>
+                    </div>
+                    <p className="font-semibold">{message.text}</p>
                 </div>
             )}
 
-            <div className="space-y-4">
-                {DOCUMENT_TYPES.map((doc) => {
-                    const existing = documents[doc.key];
-                    const isUploading = uploading === doc.key;
+            <div className="space-y-6">
+                {/* Standard Documents */}
+                <h2 className="text-2xl font-bold text-gray-900 mt-12 mb-6 flex items-center gap-2">
+                    <span className="h-2 w-2 bg-indigo-600 rounded-full"></span>
+                    Identity & School Records
+                </h2>
+                <div className="grid gap-6">
+                    {DOCUMENT_TYPES.map((doc) => {
+                        const existing = getExisting(doc.key);
+                        const isUploading = uploading === doc.key;
 
-                    return (
-                        <div key={doc.key} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="flex-1">
-                                <h3 className="text-lg font-bold text-gray-900">{doc.label}</h3>
-                                <p className="text-sm text-gray-500 mb-2">{doc.description}</p>
-                                {existing && (
-                                    <div className="flex items-center gap-2 text-green-600 text-xs font-semibold">
-                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                        </svg>
-                                        Uploaded: {existing.fileName}
-                                    </div>
-                                )}
-                            </div>
+                        return (
+                            <div key={doc.key} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-xl hover:border-indigo-100 transition-all group">
+                                <div className="flex-1">
+                                    <h3 className="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{doc.label}</h3>
+                                    <p className="text-gray-500 mt-1 font-medium">{doc.description}</p>
+                                    {existing && (
+                                        <div className="mt-3 flex items-center gap-2 text-indigo-500 text-sm font-bold bg-indigo-50 w-fit px-3 py-1 rounded-full">
+                                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                            </svg>
+                                            {existing.fileName}
+                                        </div>
+                                    )}
+                                </div>
 
-                            <div className="flex items-center gap-3">
-                                {existing && (
-                                    <a
-                                        href={`http://localhost:5000${existing.fileUrl}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-gray-500 hover:text-indigo-600 p-2 rounded-full hover:bg-gray-100 transition-colors"
-                                        title="View Document"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                        </svg>
-                                    </a>
-                                )}
+                                <div className="flex items-center gap-4">
+                                    {existing && (
+                                        <a href={`http://localhost:5000${existing.fileUrl}`} target="_blank" className="p-4 bg-gray-50 rounded-2xl text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all shadow-inner">
+                                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                        </a>
+                                    )}
 
-                                <label className={`relative flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl cursor-pointer hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 outline-none ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                    {isUploading ? 'Uploading...' : (existing ? 'Replace' : 'Upload')}
-                                    <input
-                                        type="file"
-                                        className="hidden"
-                                        accept=".pdf,image/*"
-                                        disabled={isUploading}
-                                        onChange={(e) => {
+                                    <label className={`flex items-center justify-center px-8 py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all cursor-pointer whitespace-nowrap active:scale-95 ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                        {isUploading ? 'Uploading...' : (existing ? 'Replace File' : 'Upload File')}
+                                        <input type="file" className="hidden" accept=".pdf,image/*" disabled={isUploading} onChange={(e) => {
                                             const file = e.target.files?.[0];
                                             if (file) handleFileChange(doc.key, file);
-                                        }}
-                                    />
+                                        }} />
+                                    </label>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* University Marksheets Section */}
+                <h2 className="text-2xl font-bold text-gray-900 mt-16 mb-6 flex items-center gap-2">
+                    <span className="h-2 w-2 bg-purple-600 rounded-full"></span>
+                    University Marksheets (Semester Wise)
+                </h2>
+
+                <div className="bg-purple-50 p-8 rounded-3xl border border-purple-100 flex flex-col md:flex-row items-end gap-4 mb-8">
+                    <div className="flex-1 w-full text-left">
+                        <label className="block text-sm font-bold text-purple-700 mb-2 uppercase tracking-widest ml-1">Semester Name</label>
+                        <input
+                            type="text"
+                            placeholder="e.g. Sem 1, Sem 2..."
+                            className="w-full px-6 py-4 bg-white border-2 border-purple-100 rounded-2xl focus:border-purple-500 outline-none transition-all font-bold text-purple-900 placeholder-purple-200 shadow-inner"
+                            value={universityLabel}
+                            onChange={(e) => setUniversityLabel(e.target.value)}
+                        />
+                    </div>
+                    <label className={`w-full md:w-auto flex items-center justify-center px-8 py-4 bg-purple-600 text-white font-extrabold rounded-2xl shadow-lg shadow-purple-100 hover:bg-purple-700 transition-all cursor-pointer active:scale-95 ${!universityLabel || uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                        {uploading?.startsWith('UNIVERSITY') ? 'Uploading...' : 'Add Marksheet'}
+                        <input
+                            type="file"
+                            className="hidden"
+                            disabled={!universityLabel || !!uploading}
+                            onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleFileChange('UNIVERSITY_MARKSHEET', file, universityLabel);
+                            }}
+                        />
+                    </label>
+                </div>
+
+                <div className="grid gap-4">
+                    {getUniversityDocs().map((doc) => (
+                        <div key={doc._id} className="bg-white p-5 rounded-2xl border border-gray-100 flex items-center justify-between group hover:border-purple-200 transition-all shadow-sm">
+                            <div>
+                                <h4 className="font-extrabold text-gray-900 group-hover:text-purple-600 transition-colors uppercase">{doc.customLabel}</h4>
+                                <p className="text-xs text-gray-400 font-mono mt-1">{doc.fileName}</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <a href={`http://localhost:5000${doc.fileUrl}`} target="_blank" className="p-3 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all">
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                </a>
+                                <label className="text-xs font-bold text-purple-600 cursor-pointer hover:underline bg-purple-50 px-3 py-1.5 rounded-lg">
+                                    Update
+                                    <input type="file" className="hidden" onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) handleFileChange('UNIVERSITY_MARKSHEET', file, doc.customLabel);
+                                    }} />
                                 </label>
                             </div>
                         </div>
-                    );
-                })}
+                    ))}
+                    {getUniversityDocs().length === 0 && (
+                        <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-3xl">
+                            <p className="text-gray-400 font-bold italic tracking-wide">No university marksheets uploaded yet.</p>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
@@ -164,8 +232,8 @@ function Pointer1Content() {
 
 export default function Pointer1Page() {
     return (
-        <div className="min-h-screen bg-gray-50">
-            <Suspense fallback={<div className="p-8 text-center">Loading Content...</div>}>
+        <div className="min-h-screen bg-gray-50 font-sans">
+            <Suspense fallback={<div className="p-8 text-center text-indigo-400 font-black animate-bounce">LOADING...</div>}>
                 <Pointer1Content />
             </Suspense>
         </div>
