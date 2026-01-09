@@ -24,6 +24,33 @@ const DOCUMENT_TYPES = [
     { key: 'MARKSHEET_12', label: 'Class 12 Marksheet', description: 'Academic record for 12th grade.' },
 ];
 
+function InlineDocViewer({ url, onClose }: { url: string, onClose: () => void }) {
+    const fullUrl = `http://localhost:5000${url}`;
+    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+
+    return (
+        <div className="mt-4 relative bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border-4 border-gray-800 animate-in fade-in zoom-in-95 duration-300">
+            <div className="absolute top-4 right-4 z-10">
+                <button
+                    onClick={onClose}
+                    className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all border border-white/20"
+                >
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div className="min-h-[500px] flex items-center justify-center bg-gray-800">
+                {isImage ? (
+                    <img src={fullUrl} alt="Document" className="max-w-full max-h-[800px] object-contain" />
+                ) : (
+                    <iframe src={fullUrl} className="w-full h-[600px] border-none" title="Document Viewer" />
+                )}
+            </div>
+        </div>
+    );
+}
+
 function Pointer1Content() {
     const searchParams = useSearchParams();
     const studentId = searchParams.get('studentId');
@@ -33,6 +60,7 @@ function Pointer1Content() {
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState<string | null>(null);
     const [universityLabel, setUniversityLabel] = useState('');
+    const [viewingDocId, setViewingDocId] = useState<string | null>(null);
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     const fetchStatus = async () => {
@@ -125,40 +153,49 @@ function Pointer1Content() {
                     {DOCUMENT_TYPES.map((doc) => {
                         const existing = getExisting(doc.key);
                         const isUploading = uploading === doc.key;
+                        const isViewing = viewingDocId === doc.key;
 
                         return (
-                            <div key={doc.key} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-xl hover:border-indigo-100 transition-all group">
-                                <div className="flex-1">
-                                    <h3 className="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{doc.label}</h3>
-                                    <p className="text-gray-500 mt-1 font-medium">{doc.description}</p>
-                                    {existing && (
-                                        <div className="mt-3 flex items-center gap-2 text-indigo-500 text-sm font-bold bg-indigo-50 w-fit px-3 py-1 rounded-full">
-                                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                                            </svg>
-                                            {existing.fileName}
-                                        </div>
-                                    )}
-                                </div>
+                            <div key={doc.key} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col gap-6 hover:shadow-xl hover:border-indigo-100 transition-all group">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                    <div className="flex-1">
+                                        <h3 className="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{doc.label}</h3>
+                                        <p className="text-gray-500 mt-1 font-medium">{doc.description}</p>
+                                        {existing && (
+                                            <div className="mt-3 flex items-center gap-2 text-indigo-500 text-sm font-bold bg-indigo-50 w-fit px-3 py-1 rounded-full">
+                                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                                </svg>
+                                                {existing.fileName}
+                                            </div>
+                                        )}
+                                    </div>
 
-                                <div className="flex items-center gap-4">
-                                    {existing && (
-                                        <a href={`http://localhost:5000${existing.fileUrl}`} target="_blank" className="p-4 bg-gray-50 rounded-2xl text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all shadow-inner">
-                                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                            </svg>
-                                        </a>
-                                    )}
+                                    <div className="flex items-center gap-4">
+                                        {existing && (
+                                            <button
+                                                onClick={() => setViewingDocId(isViewing ? null : doc.key)}
+                                                className={`p-4 rounded-2xl transition-all shadow-inner ${isViewing ? 'bg-indigo-600 text-white' : 'bg-gray-50 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                            >
+                                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                </svg>
+                                            </button>
+                                        )}
 
-                                    <label className={`flex items-center justify-center px-8 py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all cursor-pointer whitespace-nowrap active:scale-95 ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                        {isUploading ? 'Uploading...' : (existing ? 'Replace File' : 'Upload File')}
-                                        <input type="file" className="hidden" accept=".pdf,image/*" disabled={isUploading} onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (file) handleFileChange(doc.key, file);
-                                        }} />
-                                    </label>
+                                        <label className={`flex items-center justify-center px-8 py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all cursor-pointer whitespace-nowrap active:scale-95 ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                            {isUploading ? 'Uploading...' : (existing ? 'Replace File' : 'Upload File')}
+                                            <input type="file" className="hidden" accept=".pdf,image/*" disabled={isUploading} onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) handleFileChange(doc.key, file);
+                                            }} />
+                                        </label>
+                                    </div>
                                 </div>
+                                {isViewing && existing && (
+                                    <InlineDocViewer url={existing.fileUrl} onClose={() => setViewingDocId(null)} />
+                                )}
                             </div>
                         );
                     })}
@@ -196,29 +233,40 @@ function Pointer1Content() {
                 </div>
 
                 <div className="grid gap-4">
-                    {getUniversityDocs().map((doc) => (
-                        <div key={doc._id} className="bg-white p-5 rounded-2xl border border-gray-100 flex items-center justify-between group hover:border-purple-200 transition-all shadow-sm">
-                            <div>
-                                <h4 className="font-extrabold text-gray-900 group-hover:text-purple-600 transition-colors uppercase">{doc.customLabel}</h4>
-                                <p className="text-xs text-gray-400 font-mono mt-1">{doc.fileName}</p>
+                    {getUniversityDocs().map((doc) => {
+                        const isViewing = viewingDocId === doc._id;
+                        return (
+                            <div key={doc._id} className="bg-white p-5 rounded-3xl border border-gray-100 flex flex-col gap-4 group hover:border-purple-200 transition-all shadow-sm">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h4 className="font-extrabold text-gray-900 group-hover:text-purple-600 transition-colors uppercase">{doc.customLabel}</h4>
+                                        <p className="text-xs text-gray-400 font-mono mt-1">{doc.fileName}</p>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => setViewingDocId(isViewing ? null : doc._id)}
+                                            className={`p-3 rounded-xl transition-all ${isViewing ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}
+                                        >
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                        </button>
+                                        <label className="text-xs font-bold text-purple-600 cursor-pointer hover:underline bg-purple-50 px-3 py-1.5 rounded-lg">
+                                            Update
+                                            <input type="file" className="hidden" onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) handleFileChange('UNIVERSITY_MARKSHEET', file, doc.customLabel);
+                                            }} />
+                                        </label>
+                                    </div>
+                                </div>
+                                {isViewing && (
+                                    <InlineDocViewer url={doc.fileUrl} onClose={() => setViewingDocId(null)} />
+                                )}
                             </div>
-                            <div className="flex items-center gap-3">
-                                <a href={`http://localhost:5000${doc.fileUrl}`} target="_blank" className="p-3 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all">
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
-                                </a>
-                                <label className="text-xs font-bold text-purple-600 cursor-pointer hover:underline bg-purple-50 px-3 py-1.5 rounded-lg">
-                                    Update
-                                    <input type="file" className="hidden" onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) handleFileChange('UNIVERSITY_MARKSHEET', file, doc.customLabel);
-                                    }} />
-                                </label>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                     {getUniversityDocs().length === 0 && (
                         <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-3xl">
                             <p className="text-gray-400 font-bold italic tracking-wide">No university marksheets uploaded yet.</p>

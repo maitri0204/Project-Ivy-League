@@ -32,6 +32,33 @@ const DOC_LABELS: Record<string, string> = {
     UNIVERSITY_MARKSHEET: 'University Marksheet',
 };
 
+function InlineDocViewer({ url, onClose }: { url: string, onClose: () => void }) {
+    const fullUrl = `http://localhost:5000${url}`;
+    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+
+    return (
+        <div className="mt-4 relative bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border-4 border-gray-800 animate-in fade-in zoom-in-95 duration-300">
+            <div className="absolute top-4 right-4 z-10">
+                <button
+                    onClick={onClose}
+                    className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all border border-white/20"
+                >
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div className="min-h-[500px] flex items-center justify-center bg-gray-800">
+                {isImage ? (
+                    <img src={fullUrl} alt="Document" className="max-w-full max-h-[800px] object-contain" />
+                ) : (
+                    <iframe src={fullUrl} className="w-full h-[600px] border-none" title="Document Viewer" />
+                )}
+            </div>
+        </div>
+    );
+}
+
 function EvaluationForm({ doc, studentIvyServiceId, counselorId, onSave }: { doc: AcademicDoc, studentIvyServiceId: string, counselorId: string, onSave: () => void }) {
     const [score, setScore] = useState(doc.evaluation?.score.toString() || '');
     const [feedback, setFeedback] = useState(doc.evaluation?.feedback || '');
@@ -110,6 +137,7 @@ function CounselorPointer1Content() {
 
     const [documents, setDocuments] = useState<AcademicDoc[]>([]);
     const [loading, setLoading] = useState(true);
+    const [viewingDocId, setViewingDocId] = useState<string | null>(null);
 
     const fetchStatus = async () => {
         if (!studentId) return;
@@ -137,44 +165,50 @@ function CounselorPointer1Content() {
 
     if (loading) return <div className="p-12 text-center text-indigo-400 font-black animate-pulse tracking-widest uppercase">Fetching Records...</div>;
 
-    const renderDocCard = (d: AcademicDoc, isMarksheet: boolean = false) => (
-        <div key={d._id} className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 hover:shadow-xl hover:border-indigo-100 transition-all mb-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div>
-                    <h3 className="text-2xl font-black text-gray-900 tracking-tight uppercase">
-                        {d.documentType === 'UNIVERSITY_MARKSHEET' ? d.customLabel : DOC_LABELS[d.documentType]}
-                    </h3>
-                    <p className="text-gray-400 text-sm font-mono mt-1">{d.fileName}</p>
-                    {d.evaluation && (
-                        <div className="mt-3 inline-flex items-center gap-2 bg-green-50 text-green-600 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider">
-                            <span className="h-1.5 w-1.5 bg-green-500 rounded-full animate-pulse"></span>
-                            Score: {d.evaluation.score}/10
-                        </div>
-                    )}
+    const renderDocCard = (d: AcademicDoc, isMarksheet: boolean = false) => {
+        const isViewing = viewingDocId === d._id;
+        return (
+            <div key={d._id} className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 hover:shadow-xl hover:border-indigo-100 transition-all mb-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div>
+                        <h3 className="text-2xl font-black text-gray-900 tracking-tight uppercase">
+                            {d.documentType === 'UNIVERSITY_MARKSHEET' ? d.customLabel : DOC_LABELS[d.documentType]}
+                        </h3>
+                        <p className="text-gray-400 text-sm font-mono mt-1">{d.fileName}</p>
+                        {d.evaluation && (
+                            <div className="mt-3 inline-flex items-center gap-2 bg-green-50 text-green-600 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider">
+                                <span className="h-1.5 w-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                                Score: {d.evaluation.score}/10
+                            </div>
+                        )}
+                    </div>
+                    <button
+                        onClick={() => setViewingDocId(isViewing ? null : d._id)}
+                        className={`flex items-center gap-2 px-6 py-3 font-bold rounded-2xl transition-all border shadow-inner ${isViewing ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-50 text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 border-transparent hover:border-indigo-100'}`}
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        {isViewing ? 'CLOSE VIEW' : 'VIEW FILE'}
+                    </button>
                 </div>
-                <a
-                    href={`http://localhost:5000${d.fileUrl}`}
-                    target="_blank"
-                    className="flex items-center gap-2 px-6 py-3 bg-gray-50 text-gray-600 font-bold rounded-2xl hover:bg-indigo-50 hover:text-indigo-600 transition-all border border-transparent hover:border-indigo-100 shadow-inner"
-                >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                    VIEW FILE
-                </a>
-            </div>
 
-            {isMarksheet && studentIvyServiceId && counselorId && (
-                <EvaluationForm
-                    doc={d}
-                    studentIvyServiceId={studentIvyServiceId}
-                    counselorId={counselorId}
-                    onSave={fetchStatus}
-                />
-            )}
-        </div>
-    );
+                {isViewing && (
+                    <InlineDocViewer url={d.fileUrl} onClose={() => setViewingDocId(null)} />
+                )}
+
+                {isMarksheet && studentIvyServiceId && counselorId && (
+                    <EvaluationForm
+                        doc={d}
+                        studentIvyServiceId={studentIvyServiceId}
+                        counselorId={counselorId}
+                        onSave={fetchStatus}
+                    />
+                )}
+            </div>
+        );
+    };
 
     return (
         <div className="min-h-screen bg-gray-50 p-6 md:p-12 font-sans tracking-tight">
