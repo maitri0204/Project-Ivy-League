@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 
 interface Pointer5Status {
   studentIvyServiceId: string;
+  studentId: string;
   guideline: {
     _id: string;
     fileName: string;
@@ -28,7 +29,7 @@ interface Pointer5Status {
 function Pointer5Content() {
   const searchParams = useSearchParams();
   const studentIvyServiceId = searchParams.get('studentIvyServiceId');
-  const studentId = searchParams.get('studentId') || '1'; // TODO: Get from auth
+  const paramStudentId = searchParams.get('studentId');
 
   const [status, setStatus] = useState<Pointer5Status | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -37,8 +38,18 @@ function Pointer5Content() {
 
   // Fetch status
   useEffect(() => {
-    if (!studentIvyServiceId) {
+    let trimmedId = studentIvyServiceId?.trim();
+    if (trimmedId) {
+      trimmedId = trimmedId.replace(/['"]+/g, '');
+    }
+
+    if (!trimmedId) {
       setMessage({ type: 'error', text: 'Student Ivy Service ID is required' });
+      return;
+    }
+
+    if (trimmedId.length !== 24) {
+      setMessage({ type: 'error', text: 'Invalid Student Ivy Service ID' });
       return;
     }
 
@@ -46,7 +57,7 @@ function Pointer5Content() {
       setLoading(true);
       try {
         const response = await axios.get(`http://localhost:5000/api/pointer5/status`, {
-          params: { studentIvyServiceId },
+          params: { studentIvyServiceId: trimmedId },
         });
         if (response.data.success) {
           setStatus(response.data.data);
@@ -72,14 +83,23 @@ function Pointer5Content() {
       return;
     }
 
+    // Use studentId from status or params
+    const effectiveStudentId = status?.studentId || paramStudentId;
+
+    if (!effectiveStudentId) {
+      setMessage({ type: 'error', text: 'Student ID is required' });
+      return;
+    }
+
     setUploadingEssay(true);
     setMessage(null);
 
     try {
       const formData = new FormData();
+      // Append fields BEFORE file for better compatibility
+      formData.append('studentIvyServiceId', studentIvyServiceId.trim());
+      formData.append('studentId', effectiveStudentId.trim());
       formData.append('essayFile', file);
-      formData.append('studentIvyServiceId', studentIvyServiceId);
-      formData.append('studentId', studentId);
 
       const response = await axios.post('http://localhost:5000/api/pointer5/essay/upload', formData, {
         headers: {
@@ -200,11 +220,10 @@ function Pointer5Content() {
           {/* Messages */}
           {message && (
             <div
-              className={`p-4 rounded-md ${
-                message.type === 'success'
-                  ? 'bg-green-50 text-green-800 border border-green-200'
-                  : 'bg-red-50 text-red-800 border border-red-200'
-              }`}
+              className={`p-4 rounded-md ${message.type === 'success'
+                ? 'bg-green-50 text-green-800 border border-green-200'
+                : 'bg-red-50 text-red-800 border border-red-200'
+                }`}
             >
               {message.text}
             </div>

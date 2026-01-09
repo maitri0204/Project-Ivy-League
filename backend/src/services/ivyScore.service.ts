@@ -74,6 +74,12 @@ export const calculateIvyScore = async (studentId: string) => {
             { upsert: true, new: true }
         );
 
+        // SYNC: Update the main service record with the overall score
+        await StudentIvyService.findByIdAndUpdate(studentService._id, {
+            overallScore: Math.round(totalScore * 100) / 100,
+            updatedAt: new Date()
+        });
+
         return scoreCard;
     } catch (error) {
         console.error('Error calculating Ivy score:', error);

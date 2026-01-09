@@ -238,7 +238,7 @@ function Pointer5Content() {
                     value={score}
                     onChange={(e) => setScore(e.target.value)}
                     disabled={uploadingEvaluation}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                     placeholder="Enter score (0-10)"
                   />
                 </div>
@@ -252,7 +252,7 @@ function Pointer5Content() {
                     onChange={(e) => setFeedback(e.target.value)}
                     disabled={uploadingEvaluation}
                     rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y text-gray-900 bg-white"
                     placeholder="Enter feedback..."
                   />
                 </div>
@@ -290,11 +290,10 @@ function Pointer5Content() {
           {/* Messages */}
           {message && (
             <div
-              className={`p-4 rounded-md ${
-                message.type === 'success'
+              className={`p-4 rounded-md ${message.type === 'success'
                   ? 'bg-green-50 text-green-800 border border-green-200'
                   : 'bg-red-50 text-red-800 border border-red-200'
-              }`}
+                }`}
             >
               {message.text}
             </div>

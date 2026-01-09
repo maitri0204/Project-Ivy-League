@@ -6,6 +6,7 @@ import StudentIvyService from '../models/ivy/StudentIvyService';
 import User from '../models/ivy/User';
 import { PointerNo } from '../types/PointerNo';
 import { USER_ROLE } from '../types/roles';
+import { updateScoreAfterEvaluation } from './ivyScore.service';
 import path from 'path';
 import fs from 'fs';
 
@@ -278,6 +279,13 @@ export const evaluateEssay = async (
     evaluatedBy: new mongoose.Types.ObjectId(counselorId),
   });
 
+  // Update overall Ivy score
+  await updateScoreAfterEvaluation(
+    service._id.toString(),
+    PointerNo.AuthenticStorytelling,
+    score
+  );
+
   return evaluation;
 };
 
@@ -288,7 +296,7 @@ export const evaluateEssay = async (
 export const getPointer5Status = async (studentIdOrServiceId: string, useServiceId: boolean = false) => {
   // Validate input
   if (!mongoose.Types.ObjectId.isValid(studentIdOrServiceId)) {
-    throw new Error('Invalid studentId or studentIvyServiceId');
+    throw new Error(`Invalid studentId or studentIvyServiceId: "${studentIdOrServiceId}"`);
   }
 
   // Find student's Ivy service
@@ -298,9 +306,9 @@ export const getPointer5Status = async (studentIdOrServiceId: string, useService
   } else {
     service = await StudentIvyService.findOne({ studentId: studentIdOrServiceId });
   }
-  
+
   if (!service) {
-    throw new Error('Student Ivy Service not found');
+    throw new Error(`Student Ivy Service not found for ID: ${studentIdOrServiceId} (useServiceId: ${useServiceId})`);
   }
 
   // Get guideline
@@ -325,28 +333,29 @@ export const getPointer5Status = async (studentIdOrServiceId: string, useService
 
   return {
     studentIvyServiceId: service._id,
+    studentId: service.studentId,
     guideline: guideline
       ? {
-          _id: guideline._id,
-          fileName: guideline.fileName,
-          fileUrl: guideline.fileUrl,
-          uploadedAt: guideline.uploadedAt,
-        }
+        _id: guideline._id,
+        fileName: guideline.fileName,
+        fileUrl: guideline.fileUrl,
+        uploadedAt: guideline.uploadedAt,
+      }
       : null,
     essay: submission
       ? {
-          _id: submission._id,
-          fileName: submission.fileName,
-          fileUrl: submission.fileUrl,
-          submittedAt: submission.submittedAt,
-        }
+        _id: submission._id,
+        fileName: submission.fileName,
+        fileUrl: submission.fileUrl,
+        submittedAt: submission.submittedAt,
+      }
       : null,
     evaluation: evaluation
       ? {
-          score: evaluation.score,
-          feedback: evaluation.feedback,
-          evaluatedAt: evaluation.evaluatedAt,
-        }
+        score: evaluation.score,
+        feedback: evaluation.feedback,
+        evaluatedAt: evaluation.evaluatedAt,
+      }
       : null,
   };
 };

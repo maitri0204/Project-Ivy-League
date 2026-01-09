@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import axios from 'axios';
+import { useSearchParams } from 'next/navigation';
 
 interface PointerScore {
     pointerNo: number;
@@ -34,19 +35,23 @@ const pointerDescriptions: { [key: number]: string } = {
     6: 'Research and learning beyond curriculum',
 };
 
-export default function CounselorIvyScoreDashboard() {
+function CounselorIvyScoreDashboard() {
+    const searchParams = useSearchParams();
     const [scoreData, setScoreData] = useState<IvyScoreData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [recalculating, setRecalculating] = useState(false);
 
-    // TODO: Replace with actual student ID from selection/context
-    // used for testing. In production, this would come from the logged-in user's session.
-    const studentId = '695b93a44df1114a001dc239'; // Valid ID from database
+    const studentId = searchParams.get('studentId');
 
     useEffect(() => {
-        fetchIvyScore();
-    }, []);
+        if (studentId) {
+            fetchIvyScore();
+        } else {
+            setError('Student ID is required');
+            setLoading(false);
+        }
+    }, [studentId]);
 
     const fetchIvyScore = async () => {
         try {
@@ -306,5 +311,13 @@ export default function CounselorIvyScoreDashboard() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function IvyScorePage() {
+    return (
+        <Suspense fallback={<div className="p-12 text-center text-gray-500">Loading...</div>}>
+            <CounselorIvyScoreDashboard />
+        </Suspense>
     );
 }

@@ -42,7 +42,7 @@ export default function Home() {
         </div>
 
         <div className="mt-12 text-sm text-gray-400">
-          Brainography Ivy League Module &copy; 2026
+          Ivy League Module &copy; 2026
         </div>
       </div>
     </div>

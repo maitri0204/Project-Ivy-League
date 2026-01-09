@@ -41,7 +41,6 @@ app.use('/api/agent-suggestions', agentSuggestionRoutes);
 app.use('/api/pointer5', pointer5Routes);
 app.use('/api/pointer6', pointer6Routes);
 app.use('/api/pointer/activity', pointerActivityRoutes);
-app.use('/api/pointer', pointer234ActivityRoutes);
 app.use('/api/ivy-score', ivyScoreRoutes);
 app.use('/api/admin', adminRoutes);
 

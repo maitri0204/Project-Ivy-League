@@ -218,6 +218,7 @@ export const getStatusHandler = async (req: Request, res: Response): Promise<voi
       data: status,
     });
   } catch (error: any) {
+    console.error('Error in getStatusHandler:', error);
     res.status(400).json({
       success: false,
       message: error.message || 'Failed to get status',

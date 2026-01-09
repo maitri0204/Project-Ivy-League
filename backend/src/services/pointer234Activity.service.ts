@@ -9,6 +9,7 @@ import { PointerNo } from '../types/PointerNo';
 import { USER_ROLE } from '../types/roles';
 import path from 'path';
 import fs from 'fs';
+import { updateScoreAfterEvaluation } from './ivyScore.service';
 
 // File storage directory
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'pointer234');
@@ -161,20 +162,20 @@ export const getStudentActivities = async (studentId: string): Promise<any[]> =>
       proofUploaded: !!submission,
       submission: submission
         ? {
-            _id: submission._id,
-            files: submission.files,
-            remarks: submission.remarks,
-            submittedAt: submission.submittedAt,
-          }
+          _id: submission._id,
+          files: submission.files,
+          remarks: submission.remarks,
+          submittedAt: submission.submittedAt,
+        }
         : null,
       evaluated: !!evaluation,
       evaluation: evaluation
         ? {
-            _id: evaluation._id,
-            score: evaluation.score,
-            feedback: evaluation.feedback,
-            evaluatedAt: evaluation.evaluatedAt,
-          }
+          _id: evaluation._id,
+          score: evaluation.score,
+          feedback: evaluation.feedback,
+          evaluatedAt: evaluation.evaluatedAt,
+        }
         : null,
     };
   });
@@ -350,18 +351,45 @@ export const evaluateActivity = async (
     existing.feedback = feedback || '';
     existing.evaluatedAt = new Date();
     await existing.save();
-    return existing;
+  } else {
+    // Create new evaluation
+    await CounselorEvaluation.create({
+      studentSubmissionId: new mongoose.Types.ObjectId(studentSubmissionId),
+      pointerNo,
+      score,
+      feedback: feedback || '',
+      evaluatedAt: new Date(),
+    });
   }
 
-  // Create new evaluation
-  const evaluation = await CounselorEvaluation.create({
-    studentSubmissionId: new mongoose.Types.ObjectId(studentSubmissionId),
-    pointerNo,
-    score,
-    feedback: feedback || '',
-    evaluatedAt: new Date(),
+  // Recalculate average score for this pointer
+  const finalEvaluation = await CounselorEvaluation.findOne({ studentSubmissionId });
+  await refreshPointerAverageScore(service._id.toString(), pointerNo);
+
+  return finalEvaluation!;
+};
+
+/**
+ * Recalculates the average score for a given pointer and updates the Ivy ready score.
+ */
+const refreshPointerAverageScore = async (studentIvyServiceId: string, pointerNo: number) => {
+  const studentSubmissions = await StudentSubmission.find({ studentIvyServiceId });
+  const submissionIds = studentSubmissions.map(s => s._id);
+
+  const evaluations = await CounselorEvaluation.find({
+    studentSubmissionId: { $in: submissionIds },
+    pointerNo: Number(pointerNo)
   });
 
-  return evaluation;
+  let averageScore = 0;
+  if (evaluations.length > 0) {
+    averageScore = evaluations.reduce((sum, ev) => sum + ev.score, 0) / evaluations.length;
+  }
+
+  await updateScoreAfterEvaluation(
+    studentIvyServiceId,
+    Number(pointerNo),
+    averageScore
+  );
 };
 

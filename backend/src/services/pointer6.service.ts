@@ -8,6 +8,7 @@ import { PointerNo } from '../types/PointerNo';
 import Pointer6CourseList, { IPointer6CourseList } from '../models/ivy/Pointer6CourseList';
 import Pointer6Certificate, { IPointer6Certificate } from '../models/ivy/Pointer6Certificate';
 import Pointer6Evaluation, { IPointer6Evaluation } from '../models/ivy/Pointer6Evaluation';
+import { updateScoreAfterEvaluation } from './ivyScore.service';
 
 // File storage directory for Pointer 6
 const UPLOAD_DIR_P6 = path.join(process.cwd(), 'uploads', 'pointer6');
@@ -218,6 +219,13 @@ export const evaluatePointer6 = async (
     evaluatedBy: new mongoose.Types.ObjectId(counselorId),
   });
 
+  // Update overall Ivy score
+  await updateScoreAfterEvaluation(
+    service._id.toString(),
+    PointerNo.IntellectualCuriosity,
+    score
+  );
+
   return evaluation;
 };
 
@@ -260,11 +268,11 @@ export const getPointer6Status = async (
     studentIvyServiceId: service._id,
     courseList: courseList
       ? {
-          _id: courseList._id,
-          fileName: courseList.fileName,
-          fileUrl: courseList.fileUrl,
-          uploadedAt: courseList.uploadedAt,
-        }
+        _id: courseList._id,
+        fileName: courseList.fileName,
+        fileUrl: courseList.fileUrl,
+        uploadedAt: courseList.uploadedAt,
+      }
       : null,
     certificates: certificates.map((c) => ({
       _id: c._id,
@@ -274,10 +282,10 @@ export const getPointer6Status = async (
     })),
     evaluation: evaluation
       ? {
-          score: evaluation.score,
-          feedback: evaluation.feedback,
-          evaluatedAt: evaluation.evaluatedAt,
-        }
+        score: evaluation.score,
+        feedback: evaluation.feedback,
+        evaluatedAt: evaluation.evaluatedAt,
+      }
       : null,
   };
 };

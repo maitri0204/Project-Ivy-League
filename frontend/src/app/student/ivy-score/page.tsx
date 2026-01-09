@@ -41,7 +41,7 @@ export default function IvyScoreDashboard() {
 
     // TODO: Replace with actual student ID from auth context
     // used for testing. In production, this would come from the logged-in user's session.
-    const studentId = '695b93a44df1114a001dc239'; // Valid ID from database
+    const studentId = '695b93a44df1114a001dc239'; // John Doe (seeded)
 
     useEffect(() => {
         fetchIvyScore();

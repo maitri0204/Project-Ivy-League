@@ -4,8 +4,8 @@ import Link from 'next/link';
 
 export default function StudentDashboard() {
     // Hardcoded for MVP flow demonstration
-    const studentId = '695b93a44df1114a001dc239';
-    const studentIvyServiceId = '695b93d0a501308bc51d9951'; // From Step 218
+    const studentId = '695b93a44df1114a001dc239'; // John Doe
+    const studentIvyServiceId = '695f7ae780f617ac22d4fdc1'; // Seeded Service for Jane Smith
     const queryString = `?studentId=${studentId}&studentIvyServiceId=${studentIvyServiceId}`;
 
     return (
