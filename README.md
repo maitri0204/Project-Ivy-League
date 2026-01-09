@@ -45,17 +45,6 @@ We utilize a data-driven scoring model to ensure excellence:
 
 ---
 
-## 🛠️ Installation & Setup
-To add the visual assets to your own version of this repository:
-
-1.  Upload your image to the root folder (e.g., `banner.png`).
-2.  Reference it in your Markdown using:
-    ```markdown
-    ![Service Banner](banner.png)
-    ```
-
----
-
 <p align="center">
   <i>Empowering the next generation of global leaders through structured excellence.</i>
 </p>
