@@ -90,6 +90,10 @@ export const uploadAcademicDocument = async (
         if (fs.existsSync(oldFilePath)) {
             try { fs.unlinkSync(oldFilePath); } catch (e) { }
         }
+
+        // Reset evaluation for this specific document if it exists
+        await AcademicEvaluation.deleteOne({ academicDocumentId: existing._id });
+
         existing.fileUrl = fileUrl;
         existing.fileName = file.originalname;
         existing.fileSize = file.size;
@@ -97,6 +101,10 @@ export const uploadAcademicDocument = async (
         existing.customLabel = customLabel;
         existing.uploadedAt = new Date();
         await existing.save();
+
+        // Refresh mean score (since one evaluation was removed)
+        await refreshPointer1MeanScore(studentIvyServiceId);
+
         return existing;
     }
 

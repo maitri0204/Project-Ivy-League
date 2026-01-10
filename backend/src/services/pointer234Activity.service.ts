@@ -275,10 +275,21 @@ export const uploadProof = async (
         fs.unlinkSync(oldFilePath);
       }
     }
+
+    // Capture pointerNo for score refresh before updating
+    const pointerNo = selectedActivity.pointerNo;
+
+    // Delete existing evaluation if any, so counselor must evaluate again
+    await CounselorEvaluation.deleteOne({ studentSubmissionId: existing._id });
+
     // Update existing
     existing.files = fileUrls;
     existing.submittedAt = new Date();
     await existing.save();
+
+    // Refresh average score (since evaluation was removed, average might change)
+    await refreshPointerAverageScore(studentIvyServiceId, pointerNo);
+
     return existing;
   }
 

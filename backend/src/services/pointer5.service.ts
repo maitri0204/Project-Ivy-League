@@ -187,6 +187,10 @@ export const uploadEssay = async (
     if (fs.existsSync(oldFilePath)) {
       fs.unlinkSync(oldFilePath);
     }
+
+    // Delete existing evaluation if any
+    await EssayEvaluation.deleteOne({ essaySubmissionId: existing._id });
+
     // Update existing
     existing.fileUrl = fileUrl;
     existing.fileName = file.originalname;
@@ -195,6 +199,14 @@ export const uploadEssay = async (
     existing.submittedBy = new mongoose.Types.ObjectId(studentId);
     existing.submittedAt = new Date();
     await existing.save();
+
+    // Reset Pointer 5 score to 0 until re-evaluated
+    await updateScoreAfterEvaluation(
+      studentIvyServiceId,
+      PointerNo.AuthenticStorytelling,
+      0
+    );
+
     return existing;
   }
 

@@ -164,8 +164,21 @@ export const uploadCertificates = async (
     throw new Error('No valid certificate files were uploaded');
   }
 
+  // If new certificates are uploaded, delete existing evaluation to trigger re-evaluation
+  await Pointer6Evaluation.deleteOne({
+    studentIvyServiceId: new mongoose.Types.ObjectId(studentIvyServiceId),
+    pointerNo: PointerNo.IntellectualCuriosity,
+  });
+
+  // Reset Pointer 6 score to 0 until re-evaluated
+  await updateScoreAfterEvaluation(
+    studentIvyServiceId,
+    PointerNo.IntellectualCuriosity,
+    0
+  );
+
   return created;
-};
+}
 
 /** Counselor assigns Pointer 6 score */
 export const evaluatePointer6 = async (

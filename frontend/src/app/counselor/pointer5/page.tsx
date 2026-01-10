@@ -56,6 +56,9 @@ function Pointer5Content() {
           if (response.data.data.evaluation) {
             setScore(response.data.data.evaluation.score.toString());
             setFeedback(response.data.data.evaluation.feedback || '');
+          } else {
+            setScore('');
+            setFeedback('');
           }
         }
       } catch (error: any) {
@@ -291,8 +294,8 @@ function Pointer5Content() {
           {message && (
             <div
               className={`p-4 rounded-md ${message.type === 'success'
-                  ? 'bg-green-50 text-green-800 border border-green-200'
-                  : 'bg-red-50 text-red-800 border border-red-200'
+                ? 'bg-green-50 text-green-800 border border-green-200'
+                : 'bg-red-50 text-red-800 border border-red-200'
                 }`}
             >
               {message.text}

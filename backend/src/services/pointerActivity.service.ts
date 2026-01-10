@@ -204,12 +204,22 @@ export const uploadProof = async (
   });
 
   if (existingSubmission) {
+    console.log(`[P234-Upload] Replacing existing submission for selection: ${selection._id}`);
     // Remove old files
     deleteFilesIfExist(existingSubmission.files || []);
+
+    // Delete existing evaluation if any, so counselor must evaluate again
+    const delResult = await CounselorEvaluation.deleteOne({ studentSubmissionId: existingSubmission._id });
+    console.log(`[P234-Upload] Deleted evaluation for ${existingSubmission._id}: ${delResult.deletedCount} records`);
+
     existingSubmission.files = filePaths;
     existingSubmission.remarks = remarks || '';
     existingSubmission.submittedAt = new Date();
     await existingSubmission.save();
+
+    // Refresh average score (since evaluation was removed)
+    await refreshPointerAverageScore(service._id.toString(), selection.pointerNo);
+
     return existingSubmission;
   }
 

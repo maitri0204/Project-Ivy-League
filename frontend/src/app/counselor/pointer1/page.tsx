@@ -200,6 +200,7 @@ function CounselorPointer1Content() {
 
                 {isMarksheet && studentIvyServiceId && counselorId && (
                     <EvaluationForm
+                        key={d._id + (d.evaluation?.evaluatedAt || 'unevaluated')}
                         doc={d}
                         studentIvyServiceId={studentIvyServiceId}
                         counselorId={counselorId}
