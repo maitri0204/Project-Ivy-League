@@ -42,16 +42,42 @@ export default function CounselorStudentHub({ params }: { params: Promise<{ stud
                         </div>
                     </Link>
 
-                    {/* Activities Selection */}
-                    <Link href={`/counselor/activities${queryString}`} className="block group">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md hover:border-indigo-300 transition-all h-full relative overflow-hidden">
-                            <div className="h-12 w-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-4 text-indigo-600">
+                    {/* Pointer 2: Spike in One Area */}
+                    <Link href={`/counselor/activities${queryString}&pointerNo=2`} className="block group">
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md hover:border-blue-300 transition-all h-full relative overflow-hidden">
+                            <div className="h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center mb-4 text-blue-600">
                                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                 </svg>
                             </div>
-                            <h2 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-indigo-600">Manage Activities</h2>
-                            <p className="text-gray-600 text-sm">Select activities and evaluate submitted proofs (Pointers 2-4).</p>
+                            <h2 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-blue-600">Spike in One Area</h2>
+                            <p className="text-gray-600 text-sm">Review activity suggestions and evaluate performance (Pointer 2).</p>
+                        </div>
+                    </Link>
+
+                    {/* Pointer 3: Leadership & Initiative */}
+                    <Link href={`/counselor/activities${queryString}&pointerNo=3`} className="block group">
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md hover:border-indigo-300 transition-all h-full relative overflow-hidden">
+                            <div className="h-12 w-12 bg-indigo-50 rounded-lg flex items-center justify-center mb-4 text-indigo-600">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                            </div>
+                            <h2 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-indigo-600">Leadership & Initiative</h2>
+                            <p className="text-gray-600 text-sm">Review activity suggestions and evaluate performance (Pointer 3).</p>
+                        </div>
+                    </Link>
+
+                    {/* Pointer 4: Global & Social Impact */}
+                    <Link href={`/counselor/activities${queryString}&pointerNo=4`} className="block group">
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md hover:border-purple-300 transition-all h-full relative overflow-hidden">
+                            <div className="h-12 w-12 bg-purple-50 rounded-lg flex items-center justify-center mb-4 text-purple-600">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 002 2h.158a2.5 2.5 0 012.236 1.382l.842 1.684a1 1 0 00.894.553H20M13 4.108V5a3 3 0 003 3H20m-7-7a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <h2 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-purple-600">Global & Social Impact</h2>
+                            <p className="text-gray-600 text-sm">Review activity suggestions and evaluate performance (Pointer 4).</p>
                         </div>
                     </Link>
 

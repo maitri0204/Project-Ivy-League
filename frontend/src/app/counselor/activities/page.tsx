@@ -42,7 +42,10 @@ function ActivitiesContent() {
   const counselorId = searchParams.get('counselorId') || '695b93a44df1114a001dc23d';
 
   const [studentInterest, setStudentInterest] = useState<string>('');
-  const [selectedPointer, setSelectedPointer] = useState<number | ''>(2);
+  const [selectedPointer, setSelectedPointer] = useState<number | ''>(() => {
+    const p = searchParams.get('pointerNo');
+    return p ? parseInt(p) : 2;
+  });
   const [suggestions, setSuggestions] = useState<AgentSuggestion[]>([]);
   const [selectedActivities, setSelectedActivities] = useState<Set<string>>(new Set());
   const [studentActivities, setStudentActivities] = useState<StudentActivity[]>([]);
@@ -339,25 +342,11 @@ function ActivitiesContent() {
         {/* Select Activities Tab */}
         {activeTab === 'suggestions' && (
           <div className="space-y-6">
-            {/* Pointer Selection Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              {[2, 3, 4].map((pointerNo) => (
-                <button
-                  key={pointerNo}
-                  onClick={() => setSelectedPointer(pointerNo)}
-                  className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 transition-all ${selectedPointer === pointerNo
-                    ? 'border-blue-600 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
-                    }`}
-                >
-                  <span className="text-lg font-bold mb-1">Pointer {pointerNo}</span>
-                  <span className="text-sm text-center">
-                    {pointerNo === 2 && 'Spike in One Area'}
-                    {pointerNo === 3 && 'Leadership & Initiative'}
-                    {pointerNo === 4 && 'Global & Social Impact'}
-                  </span>
-                </button>
-              ))}
+            <div className="mb-8 pb-6 border-b border-gray-100">
+              <h2 className="text-3xl font-black text-gray-900 tracking-tight uppercase flex items-center gap-3">
+                <span className={`w-3 h-10 rounded-full ${selectedPointer === 2 ? 'bg-blue-500' : selectedPointer === 3 ? 'bg-indigo-500' : 'bg-purple-500'}`}></span>
+                {getPointerLabel(selectedPointer as number)}
+              </h2>
             </div>
 
             {/* Student Interest Input */}
@@ -480,25 +469,11 @@ function ActivitiesContent() {
         {/* Evaluate Proofs Tab */}
         {activeTab === 'evaluate' && (
           <div className="space-y-6">
-            {/* Pointer Selection Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              {[2, 3, 4].map((pointerNo) => (
-                <button
-                  key={pointerNo}
-                  onClick={() => setSelectedPointer(pointerNo)}
-                  className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 transition-all ${selectedPointer === pointerNo
-                    ? 'border-blue-600 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
-                    }`}
-                >
-                  <span className="text-lg font-bold mb-1">Pointer {pointerNo}</span>
-                  <span className="text-sm text-center">
-                    {pointerNo === 2 && 'Spike in One Area'}
-                    {pointerNo === 3 && 'Leadership & Initiative'}
-                    {pointerNo === 4 && 'Global & Social Impact'}
-                  </span>
-                </button>
-              ))}
+            <div className="mb-8 pb-6 border-b border-gray-100">
+              <h2 className="text-3xl font-black text-gray-900 tracking-tight uppercase flex items-center gap-3">
+                <span className={`w-3 h-10 rounded-full ${selectedPointer === 2 ? 'bg-blue-500' : selectedPointer === 3 ? 'bg-indigo-500' : 'bg-purple-500'}`}></span>
+                {getPointerLabel(selectedPointer as number)} - EVALUATION
+              </h2>
             </div>
 
             <div className="flex justify-end">

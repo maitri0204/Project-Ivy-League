@@ -37,7 +37,10 @@ function ActivitiesContent() {
   const [loading, setLoading] = useState<boolean>(false);
   const [uploadingProof, setUploadingProof] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [activePointer, setActivePointer] = useState<number>(2);
+  const [activePointer, setActivePointer] = useState<number>(() => {
+    const p = searchParams.get('pointerNo');
+    return p ? parseInt(p) : 2;
+  });
 
   useEffect(() => {
     if (!studentId) {
@@ -179,27 +182,15 @@ function ActivitiesContent() {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-md p-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">My Activities</h1>
-
-        {/* Pointer Selection Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {[2, 3, 4].map((pointerNo) => (
-            <button
-              key={pointerNo}
-              onClick={() => setActivePointer(pointerNo)}
-              className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 transition-all ${activePointer === pointerNo
-                  ? 'border-blue-600 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
-                }`}
-            >
-              <span className="text-lg font-bold mb-1">Pointer {pointerNo}</span>
-              <span className="text-sm text-center">
-                {pointerNo === 2 && 'Spike in One Area'}
-                {pointerNo === 3 && 'Leadership & Initiative'}
-                {pointerNo === 4 && 'Global & Social Impact'}
-              </span>
-            </button>
-          ))}
+        <div className="mb-10 pb-6 border-b border-gray-100 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-black text-gray-900 tracking-tight uppercase">My Activities</h1>
+            <p className="text-gray-500 font-medium mt-1">Proof submission and tracking.</p>
+          </div>
+          <div className={`px-6 py-3 rounded-2xl border-2 flex items-center gap-3 ${activePointer === 2 ? 'border-blue-100 bg-blue-50 text-blue-700' : activePointer === 3 ? 'border-indigo-100 bg-indigo-50 text-indigo-700' : 'border-purple-100 bg-purple-50 text-purple-700'}`}>
+            <span className={`w-2 h-2 rounded-full animate-pulse ${activePointer === 2 ? 'bg-blue-500' : activePointer === 3 ? 'bg-indigo-500' : 'bg-purple-500'}`}></span>
+            <span className="font-bold uppercase tracking-wider">{getPointerLabel(activePointer)}</span>
+          </div>
         </div>
 
         {/* Messages */}

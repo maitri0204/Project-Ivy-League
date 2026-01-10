@@ -27,15 +27,38 @@ export default function StudentDashboard() {
                         </div>
                     </Link>
 
-                    <Link href={`/student/activities${queryString}`} className="block group">
+                    <Link href={`/student/activities${queryString}&pointerNo=2`} className="block group">
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md hover:border-blue-300 transition-all h-full">
+                            <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4 text-blue-600">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                            </div>
+                            <h2 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-blue-600">Spike in One Area (Pointer 2)</h2>
+                            <p className="text-gray-600 text-sm">View assigned activities and upload proofs.</p>
+                        </div>
+                    </Link>
+
+                    <Link href={`/student/activities${queryString}&pointerNo=3`} className="block group">
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md hover:border-indigo-300 transition-all h-full">
                             <div className="h-12 w-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-4 text-indigo-600">
                                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                                 </svg>
                             </div>
-                            <h2 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-indigo-600">Activities (Pointers 2-4)</h2>
+                            <h2 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-indigo-600">Leadership (Pointer 3)</h2>
+                            <p className="text-gray-600 text-sm">View assigned activities and upload proofs.</p>
+                        </div>
+                    </Link>
+
+                    <Link href={`/student/activities${queryString}&pointerNo=4`} className="block group">
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md hover:border-purple-300 transition-all h-full">
+                            <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4 text-purple-600">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 002 2h.158a2.5 2.5 0 012.236 1.382l.842 1.684a1 1 0 00.894.553H20M13 4.108V5a3 3 0 003 3H20m-7-7a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <h2 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-purple-600">Impact (Pointer 4)</h2>
                             <p className="text-gray-600 text-sm">View assigned activities and upload proofs.</p>
                         </div>
                     </Link>
