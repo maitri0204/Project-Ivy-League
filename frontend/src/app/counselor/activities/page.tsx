@@ -4,6 +4,33 @@ import { useState, useEffect, Suspense } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'next/navigation';
 
+function InlineDocViewer({ url, onClose }: { url: string, onClose: () => void }) {
+  const fullUrl = `http://localhost:5000${url}`;
+  const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+
+  return (
+    <div className="mt-4 relative bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border-4 border-gray-800 animate-in fade-in zoom-in-95 duration-300">
+      <div className="absolute top-4 right-4 z-10">
+        <button
+          onClick={onClose}
+          className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all border border-white/20"
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div className="min-h-[500px] flex items-center justify-center bg-gray-800">
+        {isImage ? (
+          <img src={fullUrl} alt="Document" className="max-w-full max-h-[800px] object-contain" />
+        ) : (
+          <iframe src={fullUrl} className="w-full h-[600px] border-none" title="Document Viewer" />
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface AgentSuggestion {
   _id: string;
   title: string;
@@ -61,6 +88,7 @@ function ActivitiesContent() {
   const [selectingActivities, setSelectingActivities] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'suggestions' | 'evaluate'>('suggestions');
+  const [viewingFileUrl, setViewingFileUrl] = useState<string | null>(null);
 
   const fetchStudentActivities = async () => {
     const studentId = searchParams.get('studentId');
@@ -526,17 +554,22 @@ function ActivitiesContent() {
                           <p className="text-xs text-blue-700 mb-3">
                             Submitted: {new Date(activity.submission!.submittedAt).toLocaleString()}
                           </p>
-                          <div className="space-y-2">
+                          <div className="space-y-4">
                             {activity.submission!.files.map((fileUrl, index) => (
-                              <div key={index} className="flex items-center gap-2">
-                                <a
-                                  href={`http://localhost:5000${fileUrl}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-800 text-sm underline"
+                              <div key={index} className="flex flex-col gap-2">
+                                <button
+                                  onClick={() => setViewingFileUrl(viewingFileUrl === fileUrl ? null : fileUrl)}
+                                  className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all w-fit ${viewingFileUrl === fileUrl ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-indigo-600 border border-indigo-100 hover:bg-indigo-50'}`}
                                 >
-                                  View Proof {index + 1}
-                                </a>
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </svg>
+                                  {viewingFileUrl === fileUrl ? 'Hide Proof' : `View Proof ${index + 1}`}
+                                </button>
+                                {viewingFileUrl === fileUrl && (
+                                  <InlineDocViewer url={fileUrl} onClose={() => setViewingFileUrl(null)} />
+                                )}
                               </div>
                             ))}
                           </div>

@@ -4,6 +4,33 @@ import { useState, useEffect, Suspense } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'next/navigation';
 
+function InlineDocViewer({ url, onClose }: { url: string, onClose: () => void }) {
+  const fullUrl = `http://localhost:5000${url}`;
+  const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+
+  return (
+    <div className="mt-4 relative bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border-4 border-gray-800 animate-in fade-in zoom-in-95 duration-300">
+      <div className="absolute top-4 right-4 z-10">
+        <button
+          onClick={onClose}
+          className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all border border-white/20"
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div className="min-h-[500px] flex items-center justify-center bg-gray-800">
+        {isImage ? (
+          <img src={fullUrl} alt="Document" className="max-w-full max-h-[800px] object-contain" />
+        ) : (
+          <iframe src={fullUrl} className="w-full h-[600px] border-none" title="Document Viewer" />
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface Pointer5Status {
   studentIvyServiceId: string;
   studentId: string;
@@ -35,6 +62,7 @@ function Pointer5Content() {
   const [loading, setLoading] = useState<boolean>(false);
   const [uploadingEssay, setUploadingEssay] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [viewingFileUrl, setViewingFileUrl] = useState<string | null>(null);
 
   // Fetch status
   useEffect(() => {
@@ -169,11 +197,24 @@ function Pointer5Content() {
             {status?.essay ? (
               <div className="p-4 bg-green-50 border border-green-200 rounded-md">
                 <p className="text-sm font-medium text-green-900 mb-2">Essay Uploaded:</p>
-                <p className="text-sm text-green-700 mb-2">{status.essay.fileName}</p>
-                <p className="text-xs text-green-600 mb-3">
-                  Submitted: {new Date(status.essay.submittedAt).toLocaleString()}
-                </p>
-                <p className="text-sm text-gray-600">You can upload a new file to replace the existing one.</p>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm text-green-700 mb-2">{status.essay.fileName}</p>
+                    <p className="text-xs text-green-600 mb-3">
+                      Submitted: {new Date(status.essay.submittedAt).toLocaleString()}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setViewingFileUrl(viewingFileUrl === status.essay!.fileUrl ? null : status.essay!.fileUrl)}
+                    className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${viewingFileUrl === status.essay!.fileUrl ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-indigo-600 border border-indigo-100'}`}
+                  >
+                    {viewingFileUrl === status.essay!.fileUrl ? 'Hide Essay' : 'View Essay'}
+                  </button>
+                </div>
+                {viewingFileUrl === status.essay.fileUrl && (
+                  <InlineDocViewer url={status.essay.fileUrl} onClose={() => setViewingFileUrl(null)} />
+                )}
+                <p className="text-sm text-gray-600 mt-4">You can upload a new file to replace the existing one.</p>
               </div>
             ) : null}
             <div className="mt-4">

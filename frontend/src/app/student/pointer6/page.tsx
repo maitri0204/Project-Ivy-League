@@ -4,6 +4,33 @@ import { useState, useEffect, Suspense } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'next/navigation';
 
+function InlineDocViewer({ url, onClose }: { url: string, onClose: () => void }) {
+  const fullUrl = `http://localhost:5000${url}`;
+  const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+
+  return (
+    <div className="mt-4 relative bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border-4 border-gray-800 animate-in fade-in zoom-in-95 duration-300">
+      <div className="absolute top-4 right-4 z-10">
+        <button
+          onClick={onClose}
+          className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all border border-white/20"
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div className="min-h-[500px] flex items-center justify-center bg-gray-800">
+        {isImage ? (
+          <img src={fullUrl} alt="Document" className="max-w-full max-h-[800px] object-contain" />
+        ) : (
+          <iframe src={fullUrl} className="w-full h-[600px] border-none" title="Document Viewer" />
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface Pointer6Status {
   studentIvyServiceId: string;
   courseList: {
@@ -34,6 +61,7 @@ function Pointer6Content() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [viewingFileUrl, setViewingFileUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!studentIvyServiceId) {
@@ -150,14 +178,19 @@ function Pointer6Content() {
                 <p className="text-sm font-medium text-gray-900 mb-2">Uploaded Certificates:</p>
                 <ul className="space-y-2 text-sm">
                   {status.certificates.map((cert) => (
-                    <li key={cert._id} className="flex items-center justify-between">
-                      <span className="text-gray-700">{cert.fileName}</span>
-                      <button
-                        onClick={() => downloadFile(cert.fileUrl)}
-                        className="text-blue-600 hover:text-blue-800 text-xs underline"
-                      >
-                        View
-                      </button>
+                    <li key={cert._id} className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-700 font-medium tracking-tight uppercase">{cert.fileName}</span>
+                        <button
+                          onClick={() => setViewingFileUrl(viewingFileUrl === cert.fileUrl ? null : cert.fileUrl)}
+                          className={`text-xs font-bold px-3 py-1 rounded-lg transition-all ${viewingFileUrl === cert.fileUrl ? 'bg-indigo-600 text-white shadow-md' : 'text-indigo-600 hover:text-indigo-800 bg-indigo-50 underline'}`}
+                        >
+                          {viewingFileUrl === cert.fileUrl ? 'Hide' : 'View'}
+                        </button>
+                      </div>
+                      {viewingFileUrl === cert.fileUrl && (
+                        <InlineDocViewer url={cert.fileUrl} onClose={() => setViewingFileUrl(null)} />
+                      )}
                     </li>
                   ))}
                 </ul>
