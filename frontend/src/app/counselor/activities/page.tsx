@@ -46,6 +46,13 @@ function ActivitiesContent() {
     const p = searchParams.get('pointerNo');
     return p ? parseInt(p) : 2;
   });
+
+  useEffect(() => {
+    const p = searchParams.get('pointerNo');
+    if (p) {
+      setSelectedPointer(parseInt(p));
+    }
+  }, [searchParams]);
   const [suggestions, setSuggestions] = useState<AgentSuggestion[]>([]);
   const [selectedActivities, setSelectedActivities] = useState<Set<string>>(new Set());
   const [studentActivities, setStudentActivities] = useState<StudentActivity[]>([]);

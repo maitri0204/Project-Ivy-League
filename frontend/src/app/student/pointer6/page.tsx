@@ -104,9 +104,9 @@ function Pointer6Content() {
 
   if (!studentIvyServiceId) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-8">
-          <div className="bg-red-50 text-red-800 border border-red-200 p-4 rounded-md">
+      <div className="py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto bg-white rounded-[2.5rem] shadow-sm border border-red-100 p-8">
+          <div className="bg-red-50 text-red-800 border border-red-200 p-6 rounded-2xl font-bold uppercase tracking-tight text-center">
             Student Ivy Service ID is required. Please provide studentIvyServiceId as a query parameter.
           </div>
         </div>
@@ -115,8 +115,8 @@ function Pointer6Content() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-8">
+    <div className="py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.02)] border border-gray-100 p-10 mt-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">
           Pointer 6: Engagement with Learning & Intellectual Curiosity
         </h1>
@@ -201,11 +201,10 @@ function Pointer6Content() {
 
           {message && (
             <div
-              className={`p-4 rounded-md ${
-                message.type === 'success'
-                  ? 'bg-green-50 text-green-800 border border-green-200'
-                  : 'bg-red-50 text-red-800 border border-red-200'
-              }`}
+              className={`p-4 rounded-md ${message.type === 'success'
+                ? 'bg-green-50 text-green-800 border border-green-200'
+                : 'bg-red-50 text-red-800 border border-red-200'
+                }`}
             >
               {message.text}
             </div>
@@ -218,17 +217,15 @@ function Pointer6Content() {
 
 export default function Pointer6Page() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-8">
-            <div className="text-center text-gray-500">Loading...</div>
-          </div>
-        </div>
-      }
-    >
-      <Pointer6Content />
-    </Suspense>
+    <div className="font-sans">
+      <Suspense
+        fallback={
+          <div className="p-20 text-center text-indigo-400 font-black tracking-widest uppercase animate-pulse">Syncing Course Progress...</div>
+        }
+      >
+        <Pointer6Content />
+      </Suspense>
+    </div>
   );
 }
 

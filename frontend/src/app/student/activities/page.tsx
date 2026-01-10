@@ -43,6 +43,13 @@ function ActivitiesContent() {
   });
 
   useEffect(() => {
+    const p = searchParams.get('pointerNo');
+    if (p) {
+      setActivePointer(parseInt(p));
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     if (!studentId) {
       setMessage({ type: 'error', text: 'Student ID is required' });
       return;
@@ -167,21 +174,20 @@ function ActivitiesContent() {
 
   if (!studentId) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-8">
-          <div className="bg-red-50 text-red-800 border border-red-200 p-4 rounded-md">
+      <div className="py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto bg-white rounded-[2.5rem] shadow-sm border border-red-100 p-8">
+          <div className="bg-red-50 text-red-800 border border-red-200 p-6 rounded-2xl font-bold uppercase tracking-tight text-center">
             Student ID is required. Please provide studentId as a query parameter.
           </div>
         </div>
       </div>
     );
   }
-
   const filteredActivities = activities.filter(a => a.pointerNo === activePointer);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-md p-8">
+    <div className="py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-5xl mx-auto bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.02)] border border-gray-100 p-10 mt-6">
         <div className="mb-10 pb-6 border-b border-gray-100 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h1 className="text-4xl font-black text-gray-900 tracking-tight uppercase">My Activities</h1>
@@ -328,8 +334,10 @@ function ActivitiesContent() {
 
 export default function ActivitiesPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <ActivitiesContent />
-    </Suspense>
+    <div className="font-sans">
+      <Suspense fallback={<div className="p-20 text-center text-gray-400 font-bold uppercase tracking-widest text-xs animate-pulse">Syncing Activities...</div>}>
+        <ActivitiesContent />
+      </Suspense>
+    </div>
   );
 }

@@ -123,9 +123,6 @@ function Pointer1Content() {
 
     return (
         <div className="max-w-4xl mx-auto py-12 px-6">
-            <Link href="/student" className="group flex items-center text-indigo-600 font-semibold mb-8 transition-all hover:translate-x-1">
-                <span className="mr-2">←</span> Back to Dashboard
-            </Link>
 
             <header className="mb-12">
                 <div className="inline-block px-3 py-1 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-full mb-4 tracking-widest uppercase">Pointer 1</div>
@@ -280,8 +277,8 @@ function Pointer1Content() {
 
 export default function Pointer1Page() {
     return (
-        <div className="min-h-screen bg-gray-50 font-sans">
-            <Suspense fallback={<div className="p-8 text-center text-indigo-400 font-black animate-bounce">LOADING...</div>}>
+        <div className="font-sans">
+            <Suspense fallback={<div className="p-12 text-center text-indigo-400 font-black animate-pulse tracking-widest uppercase">Syncing academic records...</div>}>
                 <Pointer1Content />
             </Suspense>
         </div>
