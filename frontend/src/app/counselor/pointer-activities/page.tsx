@@ -54,7 +54,7 @@ const pointerLabel = (pointerNo: number) => {
 function CounselorPointerActivitiesContent() {
   const searchParams = useSearchParams();
   const studentIvyServiceIdFromUrl = searchParams.get('studentIvyServiceId') || '';
-  const counselorIdFromUrl = searchParams.get('counselorId') || '1'; // TODO: plug into auth
+  const counselorIdFromUrl = searchParams.get('counselorId') || '695b93a44df1114a001dc23d'; // TODO: plug into auth
 
   const [studentIvyServiceId, setStudentIvyServiceId] = useState(studentIvyServiceIdFromUrl);
   const [counselorId, setCounselorId] = useState(counselorIdFromUrl);
@@ -235,8 +235,23 @@ function CounselorPointerActivitiesContent() {
     }
   };
 
-  const downloadFile = (url: string) => {
-    window.open(`${apiBase}${url}`, '_blank');
+  const downloadFile = async (url: string) => {
+    try {
+      const response = await fetch(`${apiBase}${url}`);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      const fileName = url.split('/').pop() || 'proof';
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Download failed:', error);
+      window.open(`${apiBase}${url}`, '_blank');
+    }
   };
 
   return (
@@ -322,9 +337,8 @@ function CounselorPointerActivitiesContent() {
                 {suggestions.map((sug) => (
                   <div
                     key={sug._id}
-                    className={`border rounded-lg p-4 transition ${
-                      selectedActivities.has(sug._id) ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                    }`}
+                    className={`border rounded-lg p-4 transition ${selectedActivities.has(sug._id) ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                      }`}
                   >
                     <div className="flex items-start gap-3">
                       <input
@@ -501,11 +515,10 @@ function CounselorPointerActivitiesContent() {
         {/* Messages */}
         {message && (
           <div
-            className={`p-4 rounded-md ${
-              message.type === 'success'
-                ? 'bg-green-50 text-green-800 border border-green-200'
-                : 'bg-red-50 text-red-800 border border-red-200'
-            }`}
+            className={`p-4 rounded-md ${message.type === 'success'
+              ? 'bg-green-50 text-green-800 border border-green-200'
+              : 'bg-red-50 text-red-800 border border-red-200'
+              }`}
           >
             {message.text}
           </div>

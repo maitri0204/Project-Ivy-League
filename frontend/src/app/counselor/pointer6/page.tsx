@@ -28,7 +28,7 @@ interface Pointer6Status {
 function Pointer6Content() {
   const searchParams = useSearchParams();
   const studentIvyServiceId = searchParams.get('studentIvyServiceId');
-  const counselorId = searchParams.get('counselorId') || '1'; // TODO: get from auth
+  const counselorId = searchParams.get('counselorId') || '695b93a44df1114a001dc23d'; // TODO: get from auth
 
   const [status, setStatus] = useState<Pointer6Status | null>(null);
   const [loading, setLoading] = useState(false);
@@ -136,8 +136,23 @@ function Pointer6Content() {
     }
   };
 
-  const downloadFile = (fileUrl: string) => {
-    window.open(`http://localhost:5000${fileUrl}`, '_blank');
+  const downloadFile = async (fileUrl: string) => {
+    try {
+      const response = await fetch(`http://localhost:5000${fileUrl}`);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const fileName = fileUrl.split('/').pop() || 'file';
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download failed:', error);
+      window.open(`http://localhost:5000${fileUrl}`, '_blank');
+    }
   };
 
   if (!studentIvyServiceId) {
@@ -277,8 +292,8 @@ function Pointer6Content() {
           {message && (
             <div
               className={`p-4 rounded-md ${message.type === 'success'
-                  ? 'bg-green-50 text-green-800 border border-green-200'
-                  : 'bg-red-50 text-red-800 border border-red-200'
+                ? 'bg-green-50 text-green-800 border border-green-200'
+                : 'bg-red-50 text-red-800 border border-red-200'
                 }`}
             >
               {message.text}

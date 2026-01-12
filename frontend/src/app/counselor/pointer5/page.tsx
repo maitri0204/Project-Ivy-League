@@ -28,7 +28,7 @@ interface Pointer5Status {
 function Pointer5Content() {
   const searchParams = useSearchParams();
   const studentIvyServiceId = searchParams.get('studentIvyServiceId');
-  const counselorId = searchParams.get('counselorId') || '1'; // TODO: Get from auth
+  const counselorId = searchParams.get('counselorId') || '695b93a44df1114a001dc23d'; // TODO: Get from auth
 
   const [status, setStatus] = useState<Pointer5Status | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -146,8 +146,22 @@ function Pointer5Content() {
     }
   };
 
-  const downloadFile = (fileUrl: string, fileName: string) => {
-    window.open(`http://localhost:5000${fileUrl}`, '_blank');
+  const downloadFile = async (fileUrl: string, fileName: string) => {
+    try {
+      const response = await fetch(`http://localhost:5000${fileUrl}`);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download failed:', error);
+      window.open(`http://localhost:5000${fileUrl}`, '_blank');
+    }
   };
 
   if (!studentIvyServiceId) {

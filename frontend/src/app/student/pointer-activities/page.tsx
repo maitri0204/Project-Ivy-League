@@ -95,8 +95,23 @@ function StudentPointerActivitiesContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentIvyServiceId]);
 
-  const downloadFile = (url: string) => {
-    window.open(`${apiBase}${url}`, '_blank');
+  const downloadFile = async (url: string) => {
+    try {
+      const response = await fetch(`${apiBase}${url}`);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      const fileName = url.split('/').pop() || 'proof';
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Download failed:', error);
+      window.open(`${apiBase}${url}`, '_blank');
+    }
   };
 
   const handleUpload = async (selectionId: string, files: FileList | null) => {
@@ -266,11 +281,10 @@ function StudentPointerActivitiesContent() {
 
         {message && (
           <div
-            className={`p-4 rounded-md ${
-              message.type === 'success'
+            className={`p-4 rounded-md ${message.type === 'success'
                 ? 'bg-green-50 text-green-800 border border-green-200'
                 : 'bg-red-50 text-red-800 border border-red-200'
-            }`}
+              }`}
           >
             {message.text}
           </div>

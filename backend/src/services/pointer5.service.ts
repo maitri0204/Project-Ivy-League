@@ -52,14 +52,10 @@ export const uploadGuideline = async (
     throw new Error('Invalid counselorId');
   }
 
-  // Verify studentIvyService exists and counselor matches
+  // Verify studentIvyService exists
   const service = await StudentIvyService.findById(studentIvyServiceId);
   if (!service) {
     throw new Error('Student Ivy Service not found');
-  }
-
-  if (service.counselorId.toString() !== counselorId) {
-    throw new Error('Unauthorized: Counselor does not match this service');
   }
 
   // Verify counselor role
@@ -254,14 +250,10 @@ export const evaluateEssay = async (
     throw new Error('Essay submission not found');
   }
 
-  // Verify counselor matches the service
+  // Verify studentIvyService exists
   const service = await StudentIvyService.findById(submission.studentIvyServiceId);
   if (!service) {
     throw new Error('Student Ivy Service not found');
-  }
-
-  if (service.counselorId.toString() !== counselorId) {
-    throw new Error('Unauthorized: Counselor does not match this service');
   }
 
   // Verify counselor role

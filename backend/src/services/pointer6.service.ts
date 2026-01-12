@@ -46,9 +46,6 @@ export const uploadCourseList = async (
   if (!service) {
     throw new Error('Student Ivy Service not found');
   }
-  if (service.counselorId.toString() !== counselorId) {
-    throw new Error('Unauthorized: Counselor does not match this service');
-  }
 
   const counselor = await User.findById(counselorId);
   if (!counselor || counselor.role !== USER_ROLE.COUNSELOR) {
@@ -200,9 +197,6 @@ export const evaluatePointer6 = async (
   const service = await StudentIvyService.findById(studentIvyServiceId);
   if (!service) {
     throw new Error('Student Ivy Service not found');
-  }
-  if (service.counselorId.toString() !== counselorId) {
-    throw new Error('Unauthorized: Counselor does not match this service');
   }
 
   const counselor = await User.findById(counselorId);

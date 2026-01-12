@@ -191,9 +191,6 @@ export const evaluateAcademicDocument = async (
     if (!service) {
         throw new Error('Student Ivy Service not found');
     }
-    if (service.counselorId.toString() !== counselorId) {
-        throw new Error('Unauthorized: Counselor does not match this service');
-    }
 
     const document = await AcademicDocument.findById(academicDocumentId);
     if (!document || document.studentIvyServiceId.toString() !== studentIvyServiceId) {
