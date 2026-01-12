@@ -37,6 +37,7 @@ function Pointer6Content() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [score, setScore] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [isReplacingCourseList, setIsReplacingCourseList] = useState(false);
 
   useEffect(() => {
     if (!studentIvyServiceId) {
@@ -178,32 +179,51 @@ function Pointer6Content() {
           {/* Course list upload / view */}
           <div className="border border-gray-200 rounded-lg p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Course List (Excel)</h2>
-            {status?.courseList ? (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-md space-y-2">
-                <p className="text-sm font-medium text-blue-900">Current Course List:</p>
-                <p className="text-sm text-blue-700">{status.courseList.fileName}</p>
+            {status?.courseList && !isReplacingCourseList ? (
+              <div className="p-5 bg-blue-50 border border-blue-200 rounded-2xl flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black tracking-widest text-blue-600 uppercase">Current Course List</p>
+                  <p className="font-bold text-blue-900">{status.courseList.fileName}</p>
+                  <button
+                    onClick={() => downloadFile(status.courseList!.fileUrl)}
+                    className="text-sm font-bold text-indigo-600 hover:text-indigo-800 underline block"
+                  >
+                    Download Excel
+                  </button>
+                </div>
                 <button
-                  onClick={() => downloadFile(status.courseList!.fileUrl)}
-                  className="text-sm text-blue-600 hover:text-blue-800 underline"
+                  onClick={() => setIsReplacingCourseList(true)}
+                  className="px-4 py-2 bg-white border border-blue-200 text-blue-700 font-bold text-xs rounded-xl shadow-sm hover:bg-blue-100 transition-all uppercase tracking-wider"
                 >
-                  Download Course List
+                  Re-upload
                 </button>
               </div>
             ) : (
-              <p className="text-sm text-gray-500 mb-2">
-                No course list uploaded yet. Upload an Excel file containing the required courses.
-              </p>
+              <div className="space-y-4">
+                {isReplacingCourseList && (
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Replacing existing course list</p>
+                    <button
+                      onClick={() => setIsReplacingCourseList(false)}
+                      className="text-xs font-bold text-gray-400 hover:text-gray-600 uppercase underline"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  onChange={(e) => {
+                    handleCourseListUpload(e);
+                    setIsReplacingCourseList(false);
+                  }}
+                  disabled={uploadingCourseList}
+                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-xs file:font-black file:uppercase file:tracking-widest file:bg-blue-600 file:text-white hover:file:bg-blue-700 disabled:opacity-50 transition-all cursor-pointer"
+                />
+                <p className="mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Allowed: .xlsx, .xls</p>
+              </div>
             )}
-            <div className="mt-4">
-              <input
-                type="file"
-                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-                onChange={handleCourseListUpload}
-                disabled={uploadingCourseList}
-                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
-              />
-              <p className="mt-2 text-xs text-gray-500">Allowed: .xlsx, .xls</p>
-            </div>
           </div>
 
           {/* Certificates */}

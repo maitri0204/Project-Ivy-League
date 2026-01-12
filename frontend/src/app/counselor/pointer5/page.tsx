@@ -3,6 +3,98 @@
 import { useState, useEffect, Suspense } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'next/navigation';
+import mammoth from 'mammoth';
+
+function InlineDocViewer({ url, onClose }: { url: string, onClose: () => void }) {
+  const fullUrl = `http://localhost:5000${url}`;
+  const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+  const isWordDoc = /\.docx$/i.test(url);
+  const isPDF = /\.pdf$/i.test(url);
+  
+  const [docHtml, setDocHtml] = useState<string>('');
+  const [loadingDoc, setLoadingDoc] = useState<boolean>(false);
+  const [docError, setDocError] = useState<string>('');
+
+  useEffect(() => {
+    if (isWordDoc) {
+      setLoadingDoc(true);
+      setDocError('');
+      
+      fetch(fullUrl)
+        .then(response => response.arrayBuffer())
+        .then(arrayBuffer => mammoth.convertToHtml({ arrayBuffer }))
+        .then(result => {
+          setDocHtml(result.value);
+          setLoadingDoc(false);
+        })
+        .catch(error => {
+          console.error('Error loading document:', error);
+          setDocError('Failed to load document. Please try downloading instead.');
+          setLoadingDoc(false);
+        });
+    }
+  }, [fullUrl, isWordDoc]);
+
+  return (
+    <div className="mt-4 relative bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border-4 border-gray-800 animate-in fade-in zoom-in-95 duration-300">
+      <div className="absolute top-4 right-4 z-10">
+        <button
+          onClick={onClose}
+          className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all border border-white/20"
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div className="min-h-[500px] max-h-[800px] overflow-y-auto bg-white">
+        {isImage ? (
+          <div className="flex items-center justify-center p-4 bg-gray-800">
+            <img src={fullUrl} alt="Document" className="max-w-full max-h-[800px] object-contain" />
+          </div>
+        ) : isWordDoc ? (
+          <div className="p-8">
+            {loadingDoc ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                  <p className="text-gray-600">Loading document...</p>
+                </div>
+              </div>
+            ) : docError ? (
+              <div className="text-center py-12">
+                <p className="text-red-600 mb-4">{docError}</p>
+                <a 
+                  href={fullUrl} 
+                  download 
+                  className="inline-block bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+                >
+                  Download Document
+                </a>
+              </div>
+            ) : (
+              <div 
+                className="prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: docHtml }}
+                style={{
+                  fontFamily: 'Georgia, serif',
+                  lineHeight: '1.6',
+                  color: '#333'
+                }}
+              />
+            )}
+          </div>
+        ) : (
+          <iframe 
+            src={fullUrl} 
+            className="w-full h-[600px] border-none" 
+            title="Document Viewer"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface Pointer5Status {
   studentIvyServiceId: string;
@@ -37,6 +129,8 @@ function Pointer5Content() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [score, setScore] = useState<string>('');
   const [feedback, setFeedback] = useState<string>('');
+  const [isReplacingGuideline, setIsReplacingGuideline] = useState<boolean>(false);
+  const [viewingEssayUrl, setViewingEssayUrl] = useState<string | null>(null);
 
   // Fetch status
   useEffect(() => {
@@ -186,28 +280,65 @@ function Pointer5Content() {
           <div className="border border-gray-200 rounded-lg p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Upload Essay Guideline</h2>
             <div className="space-y-4">
-              {status?.guideline ? (
-                <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-                  <p className="text-sm font-medium text-green-900 mb-2">Guideline Uploaded:</p>
-                  <p className="text-sm text-green-700 mb-2">{status.guideline.fileName}</p>
-                  <button
-                    onClick={() => downloadFile(status.guideline!.fileUrl, status.guideline!.fileName)}
-                    className="text-sm text-blue-600 hover:text-blue-800 underline"
-                  >
-                    Download
-                  </button>
+              {status?.guideline && !isReplacingGuideline ? (
+                <div className="flex flex-col gap-4">
+                  <div className="p-5 bg-green-50 border border-green-200 rounded-2xl flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-black tracking-widest text-green-600 uppercase mb-1">Current Guideline</p>
+                      <p className="font-bold text-green-900">{status.guideline.fileName}</p>
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={() => downloadFile(status.guideline!.fileUrl, status.guideline!.fileName)}
+                          className="text-sm font-bold text-indigo-600 hover:text-indigo-800 underline mt-1 block"
+                        >
+                          Download Guideline
+                        </button>
+                        <button
+                          onClick={() => setViewingEssayUrl(viewingEssayUrl === status.guideline!.fileUrl ? null : status.guideline!.fileUrl)}
+                          className={`text-[10px] font-black tracking-widest px-3 py-1 rounded-lg transition-all ${viewingEssayUrl === status.guideline!.fileUrl ? 'bg-indigo-600 text-white' : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'}`}
+                        >
+                          {viewingEssayUrl === status.guideline!.fileUrl ? 'HIDE' : 'VIEW'}
+                        </button>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setIsReplacingGuideline(true)}
+                      className="px-4 py-2 bg-white border border-green-200 text-green-700 font-bold text-xs rounded-xl shadow-sm hover:bg-green-100 transition-all uppercase tracking-wider"
+                    >
+                      Re-upload
+                    </button>
+                  </div>
+                  {viewingEssayUrl === status.guideline.fileUrl && (
+                    <div className="mt-4">
+                      <InlineDocViewer url={status.guideline.fileUrl} onClose={() => setViewingEssayUrl(null)} />
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div>
+                <div className="space-y-4">
+                  {isReplacingGuideline && (
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Replacing existing guideline</p>
+                      <button
+                        onClick={() => setIsReplacingGuideline(false)}
+                        className="text-xs font-bold text-gray-400 hover:text-gray-600 uppercase underline"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                   <input
                     type="file"
                     id="guidelineFile"
                     accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    onChange={handleGuidelineUpload}
+                    onChange={(e) => {
+                      handleGuidelineUpload(e);
+                      setIsReplacingGuideline(false);
+                    }}
                     disabled={uploadingGuideline}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-xs file:font-black file:uppercase file:tracking-widest file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 disabled:opacity-50 transition-all cursor-pointer"
                   />
-                  <p className="mt-2 text-xs text-gray-500">Upload Word document (.doc, .docx)</p>
+                  <p className="mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Supported: .doc, .docx</p>
                 </div>
               )}
             </div>
@@ -224,12 +355,23 @@ function Pointer5Content() {
                   <p className="text-xs text-blue-600 mb-3">
                     Submitted: {new Date(status.essay.submittedAt).toLocaleString()}
                   </p>
-                  <button
-                    onClick={() => downloadFile(status.essay!.fileUrl, status.essay!.fileName)}
-                    className="text-sm text-blue-600 hover:text-blue-800 underline"
-                  >
-                    Download Essay
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => downloadFile(status.essay!.fileUrl, status.essay!.fileName)}
+                      className="text-sm text-blue-600 hover:text-blue-800 underline"
+                    >
+                      Download Essay
+                    </button>
+                    <button
+                      onClick={() => setViewingEssayUrl(viewingEssayUrl === status.essay!.fileUrl ? null : status.essay!.fileUrl)}
+                      className={`text-xs font-bold px-4 py-2 rounded-xl transition-all ${viewingEssayUrl === status.essay!.fileUrl ? 'bg-indigo-600 text-white shadow-lg' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'}`}
+                    >
+                      {viewingEssayUrl === status.essay!.fileUrl ? 'HIDE ESSAY' : 'VIEW ESSAY'}
+                    </button>
+                  </div>
+                  {viewingEssayUrl === status.essay!.fileUrl && (
+                    <InlineDocViewer url={status.essay!.fileUrl} onClose={() => setViewingEssayUrl(null)} />
+                  )}
                 </div>
               </div>
             ) : (

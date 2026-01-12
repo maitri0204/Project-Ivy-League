@@ -3,10 +3,37 @@
 import { useState, useEffect, Suspense } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'next/navigation';
+import mammoth from 'mammoth';
 
 function InlineDocViewer({ url, onClose }: { url: string, onClose: () => void }) {
   const fullUrl = `http://localhost:5000${url}`;
   const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+  const isWordDoc = /\.docx$/i.test(url);
+  const isPDF = /\.pdf$/i.test(url);
+  
+  const [docHtml, setDocHtml] = useState<string>('');
+  const [loadingDoc, setLoadingDoc] = useState<boolean>(false);
+  const [docError, setDocError] = useState<string>('');
+
+  useEffect(() => {
+    if (isWordDoc) {
+      setLoadingDoc(true);
+      setDocError('');
+      
+      fetch(fullUrl)
+        .then(response => response.arrayBuffer())
+        .then(arrayBuffer => mammoth.convertToHtml({ arrayBuffer }))
+        .then(result => {
+          setDocHtml(result.value);
+          setLoadingDoc(false);
+        })
+        .catch(error => {
+          console.error('Error loading document:', error);
+          setDocError('Failed to load document. Please try downloading instead.');
+          setLoadingDoc(false);
+        });
+    }
+  }, [fullUrl, isWordDoc]);
 
   return (
     <div className="mt-4 relative bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border-4 border-gray-800 animate-in fade-in zoom-in-95 duration-300">
@@ -20,11 +47,49 @@ function InlineDocViewer({ url, onClose }: { url: string, onClose: () => void })
           </svg>
         </button>
       </div>
-      <div className="min-h-[500px] flex items-center justify-center bg-gray-800">
+      <div className="min-h-[500px] max-h-[800px] overflow-y-auto bg-white">
         {isImage ? (
-          <img src={fullUrl} alt="Document" className="max-w-full max-h-[800px] object-contain" />
+          <div className="flex items-center justify-center p-4 bg-gray-800">
+            <img src={fullUrl} alt="Document" className="max-w-full max-h-[800px] object-contain" />
+          </div>
+        ) : isWordDoc ? (
+          <div className="p-8">
+            {loadingDoc ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                  <p className="text-gray-600">Loading document...</p>
+                </div>
+              </div>
+            ) : docError ? (
+              <div className="text-center py-12">
+                <p className="text-red-600 mb-4">{docError}</p>
+                <a 
+                  href={fullUrl} 
+                  download 
+                  className="inline-block bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+                >
+                  Download Document
+                </a>
+              </div>
+            ) : (
+              <div 
+                className="prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: docHtml }}
+                style={{
+                  fontFamily: 'Georgia, serif',
+                  lineHeight: '1.6',
+                  color: '#333'
+                }}
+              />
+            )}
+          </div>
         ) : (
-          <iframe src={fullUrl} className="w-full h-[600px] border-none" title="Document Viewer" />
+          <iframe 
+            src={fullUrl} 
+            className="w-full h-[600px] border-none" 
+            title="Document Viewer"
+          />
         )}
       </div>
     </div>
@@ -192,12 +257,23 @@ function Pointer5Content() {
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
                   <p className="text-sm font-medium text-blue-900 mb-2">Guideline Available:</p>
                   <p className="text-sm text-blue-700 mb-3">{status.guideline.fileName}</p>
-                  <button
-                    onClick={() => downloadFile(status.guideline!.fileUrl, status.guideline!.fileName)}
-                    className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                  >
-                    Download Guideline
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => downloadFile(status.guideline!.fileUrl, status.guideline!.fileName)}
+                      className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors text-sm"
+                    >
+                      Download Guideline
+                    </button>
+                    <button
+                      onClick={() => setViewingFileUrl(viewingFileUrl === status.guideline!.fileUrl ? null : status.guideline!.fileUrl)}
+                      className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${viewingFileUrl === status.guideline!.fileUrl ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-indigo-600 border border-indigo-100'}`}
+                    >
+                      {viewingFileUrl === status.guideline!.fileUrl ? 'Hide Guideline' : 'View Guideline'}
+                    </button>
+                  </div>
+                  {viewingFileUrl === status.guideline!.fileUrl && (
+                    <InlineDocViewer url={status.guideline!.fileUrl} onClose={() => setViewingFileUrl(null)} />
+                  )}
                 </div>
               </div>
             ) : (
