@@ -59,7 +59,7 @@ function InlineDocViewer({ url, onClose }: { url: string, onClose: () => void })
     );
 }
 
-function EvaluationForm({ doc, studentIvyServiceId, counselorId, onSave }: { doc: AcademicDoc, studentIvyServiceId: string, counselorId: string, onSave: () => void }) {
+function EvaluationForm({ doc, studentIvyServiceId, counselorId, onSave, onClose }: { doc: AcademicDoc, studentIvyServiceId: string, counselorId: string, onSave: () => void, onClose?: () => void }) {
     const [score, setScore] = useState(doc.evaluation?.score.toString() || '');
     const [feedback, setFeedback] = useState(doc.evaluation?.feedback || '');
     const [submitting, setSubmitting] = useState(false);
@@ -92,6 +92,17 @@ function EvaluationForm({ doc, studentIvyServiceId, counselorId, onSave }: { doc
 
     return (
         <div className="mt-4 p-5 bg-gray-50 rounded-2xl border border-gray-100 shadow-inner">
+            <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-black tracking-widest text-gray-600 uppercase">{doc.evaluation ? 'Update Evaluation' : 'Evaluate Marksheet'}</h4>
+                {doc.evaluation && onClose && (
+                    <button
+                        onClick={onClose}
+                        className="text-xs font-bold text-gray-400 hover:text-gray-600 uppercase underline"
+                    >
+                        Cancel
+                    </button>
+                )}
+            </div>
             <div className="flex flex-col sm:flex-row gap-4">
                 <div className="flex-1">
                     <label className="block text-[10px] font-black tracking-widest text-gray-400 uppercase mb-1">Marksheet Score (0-10)</label>
@@ -120,7 +131,7 @@ function EvaluationForm({ doc, studentIvyServiceId, counselorId, onSave }: { doc
                         disabled={submitting}
                         className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all text-sm h-[52px]"
                     >
-                        {submitting ? '...' : 'SAVE'}
+                        {submitting ? '...' : (doc.evaluation ? 'UPDATE' : 'SAVE')}
                     </button>
                 </div>
             </div>
@@ -138,6 +149,7 @@ function CounselorPointer1Content() {
     const [documents, setDocuments] = useState<AcademicDoc[]>([]);
     const [loading, setLoading] = useState(true);
     const [viewingDocId, setViewingDocId] = useState<string | null>(null);
+    const [updatingDocId, setUpdatingDocId] = useState<string | null>(null);
 
     const fetchStatus = async () => {
         if (!studentId) return;
@@ -199,13 +211,46 @@ function CounselorPointer1Content() {
                 )}
 
                 {isMarksheet && studentIvyServiceId && counselorId && (
-                    <EvaluationForm
-                        key={d._id + (d.evaluation?.evaluatedAt || 'unevaluated')}
-                        doc={d}
-                        studentIvyServiceId={studentIvyServiceId}
-                        counselorId={counselorId}
-                        onSave={fetchStatus}
-                    />
+                    <>
+                        {d.evaluation && updatingDocId !== d._id ? (
+                            <div className="mt-4 p-5 bg-green-50 border border-green-200 rounded-2xl">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h4 className="text-xs font-black tracking-widest text-green-600 uppercase">Current Evaluation</h4>
+                                    <button
+                                        onClick={() => setUpdatingDocId(d._id)}
+                                        className="px-4 py-2 bg-white border border-green-200 text-green-700 font-bold text-xs rounded-xl shadow-sm hover:bg-green-100 transition-all uppercase tracking-wider"
+                                    >
+                                        Update Score
+                                    </button>
+                                </div>
+                                <div className="space-y-2">
+                                    <p className="text-sm font-bold text-green-900">
+                                        Score: {d.evaluation.score}/10
+                                    </p>
+                                    {d.evaluation.feedback && (
+                                        <p className="text-sm text-green-800">
+                                            <span className="font-medium">Feedback:</span> {d.evaluation.feedback}
+                                        </p>
+                                    )}
+                                    <p className="text-xs text-green-700">
+                                        Evaluated: {new Date(d.evaluation.evaluatedAt).toLocaleString()}
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <EvaluationForm
+                                key={d._id + (d.evaluation?.evaluatedAt || 'unevaluated')}
+                                doc={d}
+                                studentIvyServiceId={studentIvyServiceId}
+                                counselorId={counselorId}
+                                onSave={() => {
+                                    setUpdatingDocId(null);
+                                    fetchStatus();
+                                }}
+                                onClose={d.evaluation ? () => setUpdatingDocId(null) : undefined}
+                            />
+                        )}
+                    </>
                 )}
             </div>
         );

@@ -3,6 +3,9 @@ import multer from 'multer';
 import {
   uploadCourseList,
   uploadCertificates,
+  replaceCertificate,
+  deleteCertificate,
+  evaluateCertificate,
   evaluatePointer6,
   getPointer6Status,
 } from '../services/pointer6.service';
@@ -185,6 +188,123 @@ export const getPointer6StatusHandler = async (req: Request, res: Response): Pro
     res.status(400).json({
       success: false,
       message: error.message || 'Failed to get Pointer 6 status',
+    });
+  }
+};
+
+/** PUT /pointer6/certificate/:certificateId/replace (Student only) */
+export const replaceCertificateMiddleware = upload.single('certificate');
+
+export const replaceCertificateHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ success: false, message: 'No file uploaded' });
+      return;
+    }
+
+    const { certificateId } = req.params;
+    const studentId = req.body.studentId || req.headers['user-id'];
+
+    if (!certificateId) {
+      res.status(400).json({ success: false, message: 'certificateId is required' });
+      return;
+    }
+    if (!studentId) {
+      res.status(400).json({ success: false, message: 'studentId is required' });
+      return;
+    }
+
+    const certificate = await replaceCertificate(certificateId, studentId as string, req.file);
+
+    res.status(200).json({
+      success: true,
+      message: 'Certificate replaced successfully. Please wait for re-evaluation.',
+      data: {
+        _id: certificate._id,
+        fileName: certificate.fileName,
+        fileUrl: certificate.fileUrl,
+        uploadedAt: certificate.uploadedAt,
+      },
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to replace certificate',
+    });
+  }
+};
+
+/** DELETE /pointer6/certificate/:certificateId (Student only) */
+export const deleteCertificateHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { certificateId } = req.params;
+    const studentId = req.body.studentId || req.headers['user-id'];
+
+    if (!certificateId) {
+      res.status(400).json({ success: false, message: 'certificateId is required' });
+      return;
+    }
+    if (!studentId) {
+      res.status(400).json({ success: false, message: 'studentId is required' });
+      return;
+    }
+
+    await deleteCertificate(certificateId, studentId as string);
+
+    res.status(200).json({
+      success: true,
+      message: 'Certificate deleted successfully',
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to delete certificate',
+    });
+  }
+};
+
+/** POST /pointer6/certificate/:certificateId/evaluate (Counselor only) */
+export const evaluateCertificateHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { certificateId } = req.params;
+    const { score, feedback } = req.body;
+    const counselorId = req.body.counselorId || req.headers['user-id'];
+
+    if (!certificateId) {
+      res.status(400).json({ success: false, message: 'certificateId is required' });
+      return;
+    }
+    if (score === undefined || score === null) {
+      res.status(400).json({ success: false, message: 'score is required (0-10)' });
+      return;
+    }
+    if (!counselorId) {
+      res.status(400).json({ success: false, message: 'counselorId is required' });
+      return;
+    }
+
+    const evaluation = await evaluateCertificate(
+      certificateId,
+      counselorId as string,
+      Number(score),
+      feedback
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Certificate evaluated successfully',
+      data: {
+        _id: evaluation._id,
+        certificateId: evaluation.certificateId,
+        score: evaluation.score,
+        feedback: evaluation.feedback,
+        evaluatedAt: evaluation.evaluatedAt,
+      },
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to evaluate certificate',
     });
   }
 };

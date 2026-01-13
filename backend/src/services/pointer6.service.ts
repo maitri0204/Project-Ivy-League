@@ -8,6 +8,7 @@ import { PointerNo } from '../types/PointerNo';
 import Pointer6CourseList, { IPointer6CourseList } from '../models/ivy/Pointer6CourseList';
 import Pointer6Certificate, { IPointer6Certificate } from '../models/ivy/Pointer6Certificate';
 import Pointer6Evaluation, { IPointer6Evaluation } from '../models/ivy/Pointer6Evaluation';
+import Pointer6CertificateEvaluation, { IPointer6CertificateEvaluation } from '../models/ivy/Pointer6CertificateEvaluation';
 import { updateScoreAfterEvaluation } from './ivyScore.service';
 
 // File storage directory for Pointer 6
@@ -161,23 +162,229 @@ export const uploadCertificates = async (
     throw new Error('No valid certificate files were uploaded');
   }
 
-  // If new certificates are uploaded, delete existing evaluation to trigger re-evaluation
-  await Pointer6Evaluation.deleteOne({
+  // Recalculate average score after new certificates are added
+  await recalculatePointer6Score(studentIvyServiceId);
+
+  return created;
+};
+
+/** Student replaces/re-uploads a specific certificate */
+export const replaceCertificate = async (
+  certificateId: string,
+  studentId: string,
+  file: Express.Multer.File
+): Promise<IPointer6Certificate> => {
+  if (!mongoose.Types.ObjectId.isValid(certificateId)) {
+    throw new Error('Invalid certificateId');
+  }
+  if (!mongoose.Types.ObjectId.isValid(studentId)) {
+    throw new Error('Invalid studentId');
+  }
+
+  const certificate = await Pointer6Certificate.findById(certificateId);
+  if (!certificate) {
+    throw new Error('Certificate not found');
+  }
+
+  // Verify student owns this certificate
+  if (certificate.uploadedBy.toString() !== studentId) {
+    throw new Error('Unauthorized: You do not own this certificate');
+  }
+
+  const student = await User.findById(studentId);
+  if (!student || student.role !== USER_ROLE.STUDENT) {
+    throw new Error('Unauthorized: User is not a student');
+  }
+
+  const allowedMimeTypes = [
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'image/jpg',
+  ];
+
+  if (!allowedMimeTypes.includes(file.mimetype)) {
+    throw new Error('Invalid file type. Only PDF and images are allowed');
+  }
+
+  // Delete old file
+  const oldFilePath = path.join(process.cwd(), certificate.fileUrl);
+  if (fs.existsSync(oldFilePath)) {
+    fs.unlinkSync(oldFilePath);
+  }
+
+  // Delete existing evaluation for this certificate (require re-evaluation)
+  await Pointer6CertificateEvaluation.deleteOne({ certificateId: certificate._id });
+
+  // Save new file
+  const fileUrl = await savePointer6File(file, 'certificates');
+
+  // Update certificate
+  certificate.fileUrl = fileUrl;
+  certificate.fileName = file.originalname;
+  certificate.fileSize = file.size;
+  certificate.mimeType = file.mimetype;
+  certificate.uploadedAt = new Date();
+  await certificate.save();
+
+  // Recalculate average score
+  await recalculatePointer6Score(certificate.studentIvyServiceId.toString());
+
+  return certificate;
+};
+
+/** Delete a specific certificate (Student) */
+export const deleteCertificate = async (
+  certificateId: string,
+  studentId: string
+): Promise<void> => {
+  if (!mongoose.Types.ObjectId.isValid(certificateId)) {
+    throw new Error('Invalid certificateId');
+  }
+
+  const certificate = await Pointer6Certificate.findById(certificateId);
+  if (!certificate) {
+    throw new Error('Certificate not found');
+  }
+
+  // Verify student owns this certificate
+  if (certificate.uploadedBy.toString() !== studentId) {
+    throw new Error('Unauthorized: You do not own this certificate');
+  }
+
+  // Delete file
+  const filePath = path.join(process.cwd(), certificate.fileUrl);
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
+
+  // Delete evaluation if exists
+  await Pointer6CertificateEvaluation.deleteOne({ certificateId: certificate._id });
+
+  // Delete certificate
+  await Pointer6Certificate.deleteOne({ _id: certificate._id });
+
+  // Recalculate average score
+  await recalculatePointer6Score(certificate.studentIvyServiceId.toString());
+};
+
+/** Counselor evaluates a specific certificate */
+export const evaluateCertificate = async (
+  certificateId: string,
+  counselorId: string,
+  score: number,
+  feedback?: string
+): Promise<IPointer6CertificateEvaluation> => {
+  if (score < 0 || score > 10) {
+    throw new Error('Score must be between 0 and 10');
+  }
+  if (!mongoose.Types.ObjectId.isValid(certificateId)) {
+    throw new Error('Invalid certificateId');
+  }
+  if (!mongoose.Types.ObjectId.isValid(counselorId)) {
+    throw new Error('Invalid counselorId');
+  }
+
+  const certificate = await Pointer6Certificate.findById(certificateId);
+  if (!certificate) {
+    throw new Error('Certificate not found');
+  }
+
+  const counselor = await User.findById(counselorId);
+  if (!counselor || counselor.role !== USER_ROLE.COUNSELOR) {
+    throw new Error('Unauthorized: User is not a counselor');
+  }
+
+  let evaluation = await Pointer6CertificateEvaluation.findOne({ certificateId });
+
+  if (evaluation) {
+    evaluation.score = score;
+    evaluation.feedback = feedback || '';
+    evaluation.evaluatedBy = new mongoose.Types.ObjectId(counselorId);
+    evaluation.evaluatedAt = new Date();
+    await evaluation.save();
+  } else {
+    evaluation = await Pointer6CertificateEvaluation.create({
+      studentIvyServiceId: certificate.studentIvyServiceId,
+      certificateId: new mongoose.Types.ObjectId(certificateId),
+      score,
+      feedback: feedback || '',
+      evaluatedBy: new mongoose.Types.ObjectId(counselorId),
+    });
+  }
+
+  // Recalculate average score after evaluation
+  await recalculatePointer6Score(certificate.studentIvyServiceId.toString());
+
+  return evaluation;
+};
+
+/** Recalculate Pointer 6 average score based on individual certificate evaluations */
+const recalculatePointer6Score = async (studentIvyServiceId: string): Promise<void> => {
+  const certificates = await Pointer6Certificate.find({
     studentIvyServiceId: new mongoose.Types.ObjectId(studentIvyServiceId),
     pointerNo: PointerNo.IntellectualCuriosity,
   });
 
-  // Reset Pointer 6 score to 0 until re-evaluated
+  if (certificates.length === 0) {
+    // No certificates, set score to 0
+    await updateScoreAfterEvaluation(
+      studentIvyServiceId,
+      PointerNo.IntellectualCuriosity,
+      0
+    );
+    return;
+  }
+
+  const certificateIds = certificates.map(c => c._id);
+  const evaluations = await Pointer6CertificateEvaluation.find({
+    certificateId: { $in: certificateIds },
+  });
+
+  if (evaluations.length === 0) {
+    // No evaluations yet, set score to 0
+    await updateScoreAfterEvaluation(
+      studentIvyServiceId,
+      PointerNo.IntellectualCuriosity,
+      0
+    );
+    return;
+  }
+
+  // Calculate average score
+  const totalScore = evaluations.reduce((sum, ev) => sum + ev.score, 0);
+  const averageScore = totalScore / evaluations.length;
+
+  // Update Pointer6Evaluation (for backward compatibility)
+  let pointer6Eval = await Pointer6Evaluation.findOne({
+    studentIvyServiceId: new mongoose.Types.ObjectId(studentIvyServiceId),
+    pointerNo: PointerNo.IntellectualCuriosity,
+  });
+
+  if (pointer6Eval) {
+    pointer6Eval.score = averageScore;
+    pointer6Eval.feedback = `Average of ${evaluations.length} certificate evaluations`;
+    pointer6Eval.evaluatedAt = new Date();
+    await pointer6Eval.save();
+  } else {
+    await Pointer6Evaluation.create({
+      studentIvyServiceId: new mongoose.Types.ObjectId(studentIvyServiceId),
+      pointerNo: PointerNo.IntellectualCuriosity,
+      score: averageScore,
+      feedback: `Average of ${evaluations.length} certificate evaluations`,
+      evaluatedBy: evaluations[0].evaluatedBy,
+    });
+  }
+
+  // Update overall Ivy score
   await updateScoreAfterEvaluation(
     studentIvyServiceId,
     PointerNo.IntellectualCuriosity,
-    0
+    averageScore
   );
+};
 
-  return created;
-}
-
-/** Counselor assigns Pointer 6 score */
+/** Counselor assigns Pointer 6 score (DEPRECATED - use individual certificate evaluation) */
 export const evaluatePointer6 = async (
   studentIvyServiceId: string,
   counselorId: string,
@@ -266,6 +473,17 @@ export const getPointer6Status = async (
     pointerNo: PointerNo.IntellectualCuriosity,
   }).sort({ uploadedAt: -1 });
 
+  // Get evaluations for each certificate
+  const certificateIds = certificates.map(c => c._id);
+  const certificateEvaluations = await Pointer6CertificateEvaluation.find({
+    certificateId: { $in: certificateIds },
+  });
+
+  const evaluationMap = new Map();
+  certificateEvaluations.forEach(ev => {
+    evaluationMap.set(ev.certificateId.toString(), ev);
+  });
+
   const evaluation = await Pointer6Evaluation.findOne({
     studentIvyServiceId: service._id,
     pointerNo: PointerNo.IntellectualCuriosity,
@@ -281,12 +499,20 @@ export const getPointer6Status = async (
         uploadedAt: courseList.uploadedAt,
       }
       : null,
-    certificates: certificates.map((c) => ({
-      _id: c._id,
-      fileName: c.fileName,
-      fileUrl: c.fileUrl,
-      uploadedAt: c.uploadedAt,
-    })),
+    certificates: certificates.map((c) => {
+      const certEval = evaluationMap.get(c._id.toString());
+      return {
+        _id: c._id,
+        fileName: c.fileName,
+        fileUrl: c.fileUrl,
+        uploadedAt: c.uploadedAt,
+        evaluation: certEval ? {
+          score: certEval.score,
+          feedback: certEval.feedback,
+          evaluatedAt: certEval.evaluatedAt,
+        } : null,
+      };
+    }),
     evaluation: evaluation
       ? {
         score: evaluation.score,

@@ -70,6 +70,7 @@ function CounselorPointerActivitiesContent() {
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [savingSelection, setSavingSelection] = useState(false);
   const [submittingEval, setSubmittingEval] = useState<string | null>(null);
+  const [updatingActivityId, setUpdatingActivityId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const apiBase = useMemo(() => 'http://localhost:5000', []);
@@ -455,59 +456,82 @@ function CounselorPointerActivitiesContent() {
                 )}
 
                 {/* Evaluation */}
-                <div className="border border-gray-200 rounded-md p-3 space-y-3">
-                  <p className="text-sm font-semibold text-gray-900">Evaluate Activity</p>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Score (0-10)</label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={10}
-                        step={0.1}
-                        value={scoreDrafts[act.selectionId] ?? ''}
-                        onChange={(e) =>
-                          setScoreDrafts((prev) => ({ ...prev, [act.selectionId]: e.target.value }))
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        disabled={submittingEval === act.selectionId}
-                      />
+                {act.evaluation && updatingActivityId !== act.selectionId ? (
+                  <div className="border border-gray-200 rounded-md p-3 bg-green-50">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-semibold text-green-900">Current Evaluation</p>
+                      <button
+                        onClick={() => setUpdatingActivityId(act.selectionId)}
+                        className="px-4 py-2 bg-white border border-green-200 text-green-700 font-bold text-xs rounded-xl shadow-sm hover:bg-green-100 transition-all uppercase tracking-wider"
+                      >
+                        Update Score
+                      </button>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Feedback</label>
-                      <textarea
-                        rows={3}
-                        value={feedbackDrafts[act.selectionId] ?? ''}
-                        onChange={(e) =>
-                          setFeedbackDrafts((prev) => ({ ...prev, [act.selectionId]: e.target.value }))
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
-                        disabled={submittingEval === act.selectionId}
-                      />
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleEvaluate(act.selectionId, act.submission?._id)}
-                    disabled={submittingEval === act.selectionId || !act.submission}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
-                  >
-                    {submittingEval === act.selectionId ? 'Saving...' : 'Save Evaluation'}
-                  </button>
-
-                  {act.evaluation && (
-                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md text-sm">
-                      <p className="font-medium text-green-900">
-                        Current score: {act.evaluation.score}/10
+                    <div className="space-y-2">
+                      <p className="text-sm font-bold text-green-900">
+                        Score: {act.evaluation.score}/10
                       </p>
                       {act.evaluation.feedback && (
-                        <p className="text-green-800 mt-1 whitespace-pre-wrap">{act.evaluation.feedback}</p>
+                        <p className="text-sm text-green-800">
+                          <span className="font-medium">Feedback:</span> {act.evaluation.feedback}
+                        </p>
                       )}
                       <p className="text-xs text-green-700">
                         Last updated: {new Date(act.evaluation.evaluatedAt).toLocaleString()}
                       </p>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="border border-gray-200 rounded-md p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-gray-900">{act.evaluation ? 'Update Evaluation' : 'Evaluate Activity'}</p>
+                      {act.evaluation && updatingActivityId === act.selectionId && (
+                        <button
+                          onClick={() => setUpdatingActivityId(null)}
+                          className="text-xs font-bold text-gray-400 hover:text-gray-600 uppercase underline"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Score (0-10)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={10}
+                          step={0.1}
+                          value={scoreDrafts[act.selectionId] ?? ''}
+                          onChange={(e) =>
+                            setScoreDrafts((prev) => ({ ...prev, [act.selectionId]: e.target.value }))
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                          disabled={submittingEval === act.selectionId}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Feedback</label>
+                        <textarea
+                          rows={3}
+                          value={feedbackDrafts[act.selectionId] ?? ''}
+                          onChange={(e) =>
+                            setFeedbackDrafts((prev) => ({ ...prev, [act.selectionId]: e.target.value }))
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y text-gray-900"
+                          disabled={submittingEval === act.selectionId}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleEvaluate(act.selectionId, act.submission?._id)}
+                      disabled={submittingEval === act.selectionId || !act.submission}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+                    >
+                      {submittingEval === act.selectionId ? 'Saving...' : (act.evaluation ? 'Update Evaluation' : 'Save Evaluation')}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
         </div>

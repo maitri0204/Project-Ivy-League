@@ -4,6 +4,10 @@ import {
   uploadCourseListMiddleware,
   uploadCertificatesHandler,
   uploadCertificatesMiddleware,
+  replaceCertificateHandler,
+  replaceCertificateMiddleware,
+  deleteCertificateHandler,
+  evaluateCertificateHandler,
   evaluatePointer6Handler,
   getPointer6StatusHandler,
 } from '../controllers/pointer6.controller';
@@ -16,7 +20,16 @@ router.post('/course-list/upload', uploadCourseListMiddleware, uploadCourseListH
 // POST /pointer6/certificate/upload - Student uploads certificates (multiple)
 router.post('/certificate/upload', uploadCertificatesMiddleware, uploadCertificatesHandler);
 
-// POST /pointer6/evaluate - Counselor assigns score
+// PUT /pointer6/certificate/:certificateId/replace - Student replaces a certificate
+router.put('/certificate/:certificateId/replace', replaceCertificateMiddleware, replaceCertificateHandler);
+
+// DELETE /pointer6/certificate/:certificateId - Student deletes a certificate
+router.delete('/certificate/:certificateId', deleteCertificateHandler);
+
+// POST /pointer6/certificate/:certificateId/evaluate - Counselor evaluates individual certificate
+router.post('/certificate/:certificateId/evaluate', evaluateCertificateHandler);
+
+// POST /pointer6/evaluate - Counselor assigns score (DEPRECATED - use individual certificate evaluation)
 router.post('/evaluate', evaluatePointer6Handler);
 
 // GET /pointer6/status/:studentId - by studentId

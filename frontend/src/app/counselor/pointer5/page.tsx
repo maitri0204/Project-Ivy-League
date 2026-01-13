@@ -131,6 +131,7 @@ function Pointer5Content() {
   const [feedback, setFeedback] = useState<string>('');
   const [isReplacingGuideline, setIsReplacingGuideline] = useState<boolean>(false);
   const [viewingEssayUrl, setViewingEssayUrl] = useState<string | null>(null);
+  const [isUpdatingEvaluation, setIsUpdatingEvaluation] = useState<boolean>(false);
 
   // Fetch status
   useEffect(() => {
@@ -228,7 +229,8 @@ function Pointer5Content() {
       });
 
       if (response.data.success) {
-        setMessage({ type: 'success', text: 'Essay evaluated successfully!' });
+        setMessage({ type: 'success', text: status?.evaluation ? 'Evaluation updated successfully!' : 'Essay evaluated successfully!' });
+        setIsUpdatingEvaluation(false);
         // Refresh status
         window.location.reload();
       }
@@ -380,9 +382,25 @@ function Pointer5Content() {
           </div>
 
           {/* Evaluate Essay Section */}
-          {status?.essay && (
+          {status?.essay && (!status?.evaluation || isUpdatingEvaluation) && (
             <div className="border border-gray-200 rounded-lg p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Evaluate Essay</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">{status.evaluation ? 'Update Evaluation' : 'Evaluate Essay'}</h2>
+                {isUpdatingEvaluation && (
+                  <button
+                    onClick={() => {
+                      setIsUpdatingEvaluation(false);
+                      if (status.evaluation) {
+                        setScore(status.evaluation.score.toString());
+                        setFeedback(status.evaluation.feedback || '');
+                      }
+                    }}
+                    className="text-xs font-bold text-gray-400 hover:text-gray-600 uppercase underline"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
               <div className="space-y-4">
                 <div>
                   <label htmlFor="score" className="block text-sm font-medium text-gray-700 mb-2">
@@ -420,22 +438,30 @@ function Pointer5Content() {
                   disabled={uploadingEvaluation || !score}
                   className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {uploadingEvaluation ? 'Submitting...' : 'Submit Evaluation'}
+                  {uploadingEvaluation ? 'Submitting...' : (status?.evaluation ? 'Update Evaluation' : 'Submit Evaluation')}
                 </button>
               </div>
             </div>
           )}
 
           {/* Current Evaluation Display */}
-          {status?.evaluation && (
+          {status?.evaluation && !isUpdatingEvaluation && (
             <div className="border border-gray-200 rounded-lg p-6 bg-green-50">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Current Evaluation</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Current Evaluation</h2>
+                <button
+                  onClick={() => setIsUpdatingEvaluation(true)}
+                  className="px-4 py-2 bg-white border border-green-200 text-green-700 font-bold text-xs rounded-xl shadow-sm hover:bg-green-100 transition-all uppercase tracking-wider"
+                >
+                  Update
+                </button>
+              </div>
               <div className="space-y-2">
-                <p className="text-sm">
+                <p className="text-sm text-gray-900">
                   <span className="font-medium">Score:</span> {status.evaluation.score}/10
                 </p>
                 {status.evaluation.feedback && (
-                  <p className="text-sm">
+                  <p className="text-sm text-gray-900">
                     <span className="font-medium">Feedback:</span> {status.evaluation.feedback}
                   </p>
                 )}
