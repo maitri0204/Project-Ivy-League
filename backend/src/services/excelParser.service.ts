@@ -241,6 +241,9 @@ export const saveAgentSuggestions = async (
     console.log(`Overwrite mode: Deleted ${deleteResult.deletedCount} existing records for pointer ${pointerNo}`);
   }
 
+  // Track titles we've already processed in this batch to handle duplicates within the Excel file
+  const processedTitles = new Set<string>();
+
   for (const row of rows) {
     if (!validateExcelRow(row)) {
       skipped++;
@@ -257,6 +260,13 @@ export const saveAgentSuggestions = async (
     const titleTrimmed = row.title.trim();
     const descriptionTrimmed = row.description.trim();
 
+    // Check if we've already processed this title in this batch
+    if (processedTitles.has(titleTrimmed)) {
+      console.log(`Skipping duplicate title in Excel file: "${titleTrimmed}"`);
+      skipped++;
+      continue;
+    }
+
     // If overwrite mode, we already deleted all records, so just create new ones
     if (overwrite) {
       await AgentSuggestion.create({
@@ -266,31 +276,41 @@ export const saveAgentSuggestions = async (
         tags: tags,
         source: 'EXCEL',
       });
+      processedTitles.add(titleTrimmed);
       created++;
       continue;
     }
 
-    // Normal mode: Check for duplicate (same title and pointerNo)
+    // Normal mode: Use upsert to update existing or create new
     const existing = await AgentSuggestion.findOne({
       title: titleTrimmed,
       pointerNo: pointerNo,
     });
 
     if (existing) {
-      skipped++;
-      continue;
+      // Update existing record
+      await AgentSuggestion.updateOne(
+        { _id: existing._id },
+        {
+          description: descriptionTrimmed,
+          tags: tags,
+          source: 'EXCEL',
+        }
+      );
+      processedTitles.add(titleTrimmed);
+      updated++;
+    } else {
+      // Create new suggestion
+      await AgentSuggestion.create({
+        pointerNo: pointerNo,
+        title: titleTrimmed,
+        description: descriptionTrimmed,
+        tags: tags,
+        source: 'EXCEL',
+      });
+      processedTitles.add(titleTrimmed);
+      created++;
     }
-
-    // Create new suggestion
-    await AgentSuggestion.create({
-      pointerNo: pointerNo,
-      title: titleTrimmed,
-      description: descriptionTrimmed,
-      tags: tags,
-      source: 'EXCEL',
-    });
-
-    created++;
   }
 
   return { created, skipped, updated };
