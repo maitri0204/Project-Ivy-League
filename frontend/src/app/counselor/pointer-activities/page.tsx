@@ -58,7 +58,7 @@ function CounselorPointerActivitiesContent() {
 
   const [studentIvyServiceId, setStudentIvyServiceId] = useState(studentIvyServiceIdFromUrl);
   const [counselorId, setCounselorId] = useState(counselorIdFromUrl);
-  const [studentInterest, setStudentInterest] = useState('');
+  const [careerRole, setCareerRole] = useState('');
   const [selectedPointer, setSelectedPointer] = useState<number | ''>(2);
   const [suggestions, setSuggestions] = useState<AgentSuggestion[]>([]);
   const [selectedActivities, setSelectedActivities] = useState<Set<string>>(new Set());
@@ -127,8 +127,8 @@ function CounselorPointerActivitiesContent() {
   }, [studentIvyServiceId]);
 
   const handleFetchSuggestions = async () => {
-    if (!studentInterest.trim()) {
-      setMessage({ type: 'error', text: 'Please enter student interest' });
+    if (!careerRole.trim()) {
+      setMessage({ type: 'error', text: 'Please enter career role' });
       return;
     }
     if (!selectedPointer) {
@@ -142,7 +142,7 @@ function CounselorPointerActivitiesContent() {
 
     try {
       const res = await axios.get<AgentSuggestion[]>(`${apiBase}/api/agent-suggestions`, {
-        params: { studentInterest: studentInterest.trim(), pointerNo: selectedPointer },
+        params: { careerRole: careerRole.trim(), pointerNo: selectedPointer },
       });
       setSuggestions(res.data);
       if (res.data.length === 0) {
@@ -287,13 +287,13 @@ function CounselorPointerActivitiesContent() {
           <h2 className="text-lg font-semibold text-gray-900">Select Agent Activities</h2>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Student Interest</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Career Role</label>
               <textarea
-                value={studentInterest}
-                onChange={(e) => setStudentInterest(e.target.value)}
+                value={careerRole}
+                onChange={(e) => setCareerRole(e.target.value)}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter the student's interest text..."
+                placeholder="Enter the student's career role (e.g., Doctor, Engineer, Finance, Lawyer)..."
               />
             </div>
             <div>
@@ -312,7 +312,7 @@ function CounselorPointerActivitiesContent() {
             <div className="flex items-end">
               <button
                 onClick={handleFetchSuggestions}
-                disabled={loadingSuggestions || !studentInterest.trim() || !selectedPointer}
+                disabled={loadingSuggestions || !careerRole.trim() || !selectedPointer}
                 className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
               >
                 {loadingSuggestions ? 'Fetching...' : 'Get Suggestions'}

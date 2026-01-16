@@ -4,21 +4,21 @@ import { PointerNo } from '../types/PointerNo';
 
 /**
  * GET /api/agent-suggestions
- * Get all strategically suitable agent suggestions based on student interest and pointer number
+ * Get all relevant agent suggestions based on career role and pointer number
  * 
  * Query parameters:
- * - studentInterest: Required - Student's interest text
+ * - careerRole: Required - Career role entered by counselor
  * - pointerNo: Required - Pointer number (2, 3, or 4)
  */
 export const getAgentSuggestionsHandler = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { studentInterest, pointerNo } = req.query;
+    const { careerRole, pointerNo } = req.query;
 
     // Validate required parameters
-    if (!studentInterest) {
+    if (!careerRole) {
       res.status(400).json({
         success: false,
-        message: 'studentInterest is required',
+        message: 'careerRole is required',
       });
       return;
     }
@@ -45,18 +45,18 @@ export const getAgentSuggestionsHandler = async (req: Request, res: Response): P
       return;
     }
 
-    // Validate studentInterest
-    if (typeof studentInterest !== 'string' || studentInterest.trim().length === 0) {
+    // Validate careerRole
+    if (typeof careerRole !== 'string' || careerRole.trim().length === 0) {
       res.status(400).json({
         success: false,
-        message: 'studentInterest must be a non-empty string',
+        message: 'careerRole must be a non-empty string',
       });
       return;
     }
 
-    // Get all suitable suggestions (no ranking, no scores)
+    // Get all relevant suggestions (high recall, no ranking)
     const suggestions = await getAgentSuggestions(
-      studentInterest as string,
+      careerRole as string,
       pointerNum as PointerNo.SpikeInOneArea | PointerNo.LeadershipInitiative | PointerNo.GlobalSocialImpact
     );
 

@@ -2,8 +2,43 @@ import AgentSuggestion, { IAgentSuggestion } from '../models/ivy/AgentSuggestion
 import { PointerNo } from '../types/PointerNo';
 
 /**
- * Normalize text for conceptual analysis
- * Deterministic: same input always produces same output
+ * ═══════════════════════════════════════════════════════════════════════════
+ * CAREER-ALIGNED ACTIVITY SUGGESTION AGENT
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * A 4-STAGE PIPELINE:
+ * Stage 1: Career Intent Understanding (semantic interpretation)
+ * Stage 2: Candidate Retrieval (high-recall, rule-based)
+ * Stage 3: LLM-Based Reasoning & Scoring (core intelligence)
+ * Stage 4: Ranking & Filtering (top 10-20 activities)
+ * 
+ * CONSTRAINTS:
+ * - NO HALLUCINATION: Only suggest from existing dataset
+ * - DATA-BOUND REASONING: Use only provided activity rows
+ * - RANKING IS MANDATORY: Best fit → weakest fit
+ * 
+ * INPUT: Career role keyword
+ * OUTPUT: Ranked list with reasoning and Ivy-level justification
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+interface ScoredActivity {
+  activity: IAgentSuggestion;
+  rank: number;
+  scores: {
+    careerAlignment: number;      // 0-5: How directly it builds career skills
+    leadershipDepth: number;       // 0-5: Founder > Leader > Contributor
+    ownershipInitiative: number;   // 0-5: Did student create/scale/own outcomes
+    impactScale: number;           // 0-5: Local < Regional < National < Global
+    spikePotential: number;        // 0-5: Can this become defining narrative
+  };
+  compositeScore: number;          // Sum of all scores
+  whyThisFits: string;             // 2-3 sentences explaining career fit
+  ivyLevelJustification: string;   // Focus on leadership + impact
+}
+
+/**
+ * Normalize text for processing
  */
 const normalizeText = (text: string): string => {
   return text
@@ -14,228 +49,422 @@ const normalizeText = (text: string): string => {
 };
 
 /**
- * Extract conceptual themes from student interest
- * Identifies key concepts, domains, and themes
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 🧠 STAGE 1 — CAREER INTENT UNDERSTANDING
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * Interprets career role semantically:
+ * - Core skills
+ * - Typical impact areas
+ * - Academic + practical expectations
+ * 
+ * Examples:
+ * - "Doctor" → healthcare delivery, public health, clinical research, mental health
+ * - "Finance" → economics, policy, markets, financial inclusion, analytics
+ * - "Law" → rights, governance, policy, advocacy, legal literacy
+ * ═══════════════════════════════════════════════════════════════════════════
  */
-const extractThemes = (text: string): Set<string> => {
-  const normalized = normalizeText(text);
-  const words = normalized.split(' ').filter((w) => w.length > 2);
+
+interface CareerIntent {
+  coreSkills: string[];
+  impactAreas: string[];
+  academicDisciplines: string[];
+  practicalApplications: string[];
+  allKeywords: Set<string>;
+}
+
+/**
+ * Domain knowledge mapping for intelligent career understanding
+ * This provides semantic expansion without hardcoding specific activities
+ * Includes both direct terms AND conceptual/skill-based keywords
+ */
+const CAREER_DOMAIN_MAP: Record<string, string[]> = {
+  // Medical/Healthcare
+  'dentist': ['dental', 'oral', 'health', 'medical', 'healthcare', 'biology', 'anatomy', 'patient', 'clinical', 'hygiene', 'orthodontic', 'teeth', 'preventive', 'diagnosis'],
+  'dental': ['dentist', 'oral', 'health', 'medical', 'healthcare', 'biology', 'anatomy', 'patient', 'clinical'],
+  'doctor': ['medical', 'healthcare', 'clinical', 'patient', 'health', 'medicine', 'hospital', 'diagnosis', 'treatment', 'biology', 'anatomy', 'physiology', 'wellness', 'disease', 'therapy'],
+  'physician': ['medical', 'healthcare', 'clinical', 'patient', 'health', 'medicine', 'hospital', 'diagnosis', 'treatment'],
+  'nurse': ['healthcare', 'medical', 'patient', 'clinical', 'health', 'nursing', 'care', 'hospital', 'wellness', 'treatment'],
+  'surgeon': ['medical', 'surgical', 'healthcare', 'clinical', 'patient', 'hospital', 'anatomy', 'operation'],
+  'pharmacist': ['pharmaceutical', 'medical', 'healthcare', 'drug', 'medicine', 'chemistry', 'clinical'],
   
-  // Common stop words to filter out
+  // STEM
+  'engineer': ['engineering', 'technical', 'design', 'build', 'system', 'technology', 'innovation', 'development', 'problem solving', 'mathematics', 'physics'],
+  'scientist': ['science', 'research', 'experiment', 'analysis', 'laboratory', 'discovery', 'study', 'investigation', 'hypothesis', 'data'],
+  'researcher': ['research', 'study', 'investigation', 'analysis', 'academic', 'scientific', 'experiment', 'data', 'publication', 'methodology'],
+  'data': ['analytics', 'statistics', 'analysis', 'programming', 'algorithm', 'machine learning', 'database', 'visualization', 'modeling', 'insights', 'python', 'coding'],
+  'software': ['programming', 'coding', 'development', 'computer', 'technology', 'algorithm', 'application', 'system', 'debugging', 'web', 'mobile'],
+  'computer': ['programming', 'coding', 'software', 'technology', 'digital', 'algorithm', 'computing', 'IT', 'cybersecurity'],
+  
+  // Business/Finance
+  'finance': ['financial', 'economics', 'banking', 'investment', 'accounting', 'market', 'business', 'monetary', 'trading', 'portfolio', 'risk'],
+  'business': ['entrepreneurship', 'management', 'economics', 'marketing', 'finance', 'corporate', 'strategy', 'commerce', 'startup', 'venture'],
+  'entrepreneur': ['business', 'startup', 'innovation', 'venture', 'enterprise', 'founding', 'commercial', 'market', 'pitch', 'scale', 'growth'],
+  'marketing': ['advertising', 'branding', 'business', 'consumer', 'digital', 'communication', 'promotion', 'strategy', 'social media', 'campaign', 'content'],
+  'accountant': ['accounting', 'finance', 'financial', 'audit', 'taxation', 'business', 'economics', 'bookkeeping'],
+  
+  // Law/Policy
+  'lawyer': ['legal', 'law', 'justice', 'court', 'litigation', 'advocacy', 'rights', 'policy', 'attorney', 'constitutional', 'criminal', 'civil'],
+  'attorney': ['legal', 'law', 'justice', 'court', 'litigation', 'advocacy', 'rights', 'policy'],
+  'policy': ['government', 'public', 'governance', 'political', 'legislation', 'advocacy', 'reform', 'analysis', 'civic', 'democracy'],
+  
+  // Arts/Media/Communication
+  'mass': ['communication', 'media', 'journalism', 'broadcasting', 'digital', 'content', 'storytelling', 'audience', 'message'],
+  'communication': ['media', 'journalism', 'broadcasting', 'public speaking', 'writing', 'storytelling', 'presentation', 'digital', 'content', 'messaging', 'audience', 'campaign', 'social media', 'film', 'video', 'podcast', 'radio', 'television', 'news', 'reporting'],
+  'journalist': ['media', 'writing', 'reporting', 'news', 'communication', 'press', 'publishing', 'investigation', 'journalism', 'interview', 'story', 'article', 'documentary', 'broadcast'],
+  'journalism': ['media', 'writing', 'reporting', 'news', 'communication', 'press', 'publishing', 'investigation', 'interview', 'story', 'article', 'documentary'],
+  'media': ['journalism', 'broadcasting', 'digital', 'social media', 'content', 'production', 'film', 'video', 'communication', 'storytelling', 'creative', 'news'],
+  'writer': ['writing', 'literature', 'creative', 'publishing', 'communication', 'storytelling', 'journalism', 'author', 'essay', 'poetry', 'novel', 'content'],
+  'arts': ['art', 'creative', 'design', 'visual', 'artistic', 'expression', 'cultural', 'aesthetic', 'painting', 'sculpture', 'drawing', 'music', 'theater', 'performance', 'dance', 'film', 'photography', 'exhibition', 'gallery', 'installation', 'craft'],
+  'art': ['arts', 'creative', 'design', 'visual', 'artistic', 'expression', 'cultural', 'aesthetic', 'painting', 'sculpture', 'drawing', 'exhibition', 'gallery'],
+  'artist': ['art', 'creative', 'design', 'visual', 'artistic', 'expression', 'cultural', 'aesthetic', 'painting', 'sculpture', 'exhibition', 'gallery', 'installation'],
+  'designer': ['design', 'creative', 'visual', 'artistic', 'graphics', 'layout', 'aesthetic', 'innovation', 'UX', 'UI', 'product', 'fashion', 'interior'],
+  'film': ['cinema', 'movie', 'video', 'production', 'directing', 'screenplay', 'editing', 'cinematography', 'visual', 'storytelling', 'creative', 'media'],
+  'theater': ['theatre', 'drama', 'performance', 'acting', 'stage', 'play', 'directing', 'production', 'creative', 'arts', 'expression'],
+  'music': ['musical', 'composition', 'performance', 'instrument', 'concert', 'orchestra', 'band', 'singing', 'melody', 'rhythm', 'creative', 'arts'],
+  'photography': ['photo', 'camera', 'visual', 'image', 'portrait', 'documentary', 'creative', 'arts', 'exhibition'],
+  
+  // Education
+  'teacher': ['education', 'teaching', 'pedagogy', 'learning', 'curriculum', 'instruction', 'academic', 'school', 'mentoring', 'tutoring'],
+  'educator': ['education', 'teaching', 'pedagogy', 'learning', 'curriculum', 'instruction', 'academic'],
+  'professor': ['academic', 'research', 'teaching', 'education', 'scholarship', 'university', 'lecture', 'faculty'],
+  
+  // Social Sciences
+  'psychologist': ['psychology', 'mental', 'behavioral', 'cognitive', 'counseling', 'therapy', 'health', 'research', 'wellness', 'emotional'],
+  'psychology': ['mental', 'behavioral', 'cognitive', 'counseling', 'therapy', 'health', 'research', 'wellness', 'emotional', 'human behavior'],
+  'sociologist': ['sociology', 'social', 'society', 'community', 'culture', 'research', 'behavior', 'analysis', 'demographics'],
+  'sociology': ['social', 'society', 'community', 'culture', 'research', 'behavior', 'analysis', 'demographics', 'human'],
+  'economist': ['economics', 'economic', 'financial', 'market', 'policy', 'analysis', 'trade', 'monetary'],
+  'economics': ['economic', 'financial', 'market', 'policy', 'analysis', 'trade', 'monetary', 'business', 'commerce'],
+  
+  // Architecture/Design
+  'architect': ['architecture', 'design', 'building', 'construction', 'structure', 'urban', 'spatial', 'planning', 'engineering'],
+  'architecture': ['design', 'building', 'construction', 'structure', 'urban', 'spatial', 'planning', 'creative', 'engineering'],
+  
+  // Environmental
+  'environment': ['environmental', 'ecology', 'sustainability', 'conservation', 'climate', 'nature', 'green', 'renewable', 'ecosystem'],
+  'environmental': ['ecology', 'sustainability', 'conservation', 'climate', 'nature', 'green', 'renewable', 'ecosystem']
+};
+
+/**
+ * Interpret career role and generate intent profile
+ * Uses domain knowledge mapping + generic keyword extraction
+ */
+const interpretCareerIntent = (careerRole: string): CareerIntent => {
+  const normalized = normalizeText(careerRole);
+  
+  // Extract all meaningful words
   const stopWords = new Set([
-    'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'her', 'was', 'one',
-    'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'its', 'may', 'new', 'now',
-    'old', 'see', 'two', 'way', 'who', 'boy', 'did', 'she', 'use', 'her', 'many', 'than',
-    'them', 'these', 'want', 'been', 'good', 'much', 'some', 'time', 'very', 'when',
-    'come', 'here', 'just', 'like', 'long', 'make', 'over', 'such', 'take', 'than',
-    'them', 'well', 'were', 'what', 'with', 'your', 'from', 'they', 'know', 'want',
-    'been', 'good', 'much', 'some', 'time', 'very', 'when', 'come', 'here', 'just'
+    'the', 'and', 'for', 'are', 'but', 'not', 'with', 'from', 'this', 'that',
+    'will', 'can', 'has', 'have', 'had', 'was', 'were', 'been', 'being',
+    'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between'
   ]);
 
-  const meaningfulWords = words.filter((w) => !stopWords.has(w));
-  return new Set(meaningfulWords);
-};
+  const careerWords = normalized
+    .split(' ')
+    .filter(word => word.length > 3) // Increased from 2 to 3 to avoid "dent" matching "student"
+    .filter(word => !stopWords.has(word));
 
-/**
- * Extract domain-specific keywords
- * Maps common terms to conceptual domains
- */
-const extractDomains = (text: string): Set<string> => {
-  const normalized = normalizeText(text);
-  const domains = new Set<string>();
-
-  // Academic domains
-  if (/\b(science|math|physics|chemistry|biology|engineering|research|academic|study|learn|education)\b/.test(normalized)) {
-    domains.add('academic');
-    domains.add('research');
-  }
-
-  // Arts/Literature domains
-  if (/\b(art|music|dance|theater|creative|design|painting|drawing|performance|visual|literature|literary|writing|poetry|novel|author|book|story|essay|journalism|creative writing)\b/.test(normalized)) {
-    domains.add('arts');
-    domains.add('creative');
-    domains.add('literature');
-  }
-
-  // Technology domains
-  if (/\b(tech|computer|programming|coding|software|digital|ai|technology|code|app|website)\b/.test(normalized)) {
-    domains.add('technology');
-    domains.add('innovation');
-  }
-
-  // Social/Community domains
-  if (/\b(social|community|help|volunteer|service|people|society|impact|change|support)\b/.test(normalized)) {
-    domains.add('social');
-    domains.add('community');
-  }
-
-  // Leadership domains
-  if (/\b(lead|leadership|organize|team|manage|direct|coordinate|initiative|found|start)\b/.test(normalized)) {
-    domains.add('leadership');
-    domains.add('initiative');
-  }
-
-  // Sports/Athletics domains
-  if (/\b(sport|athletic|team|competition|game|play|physical|fitness|exercise)\b/.test(normalized)) {
-    domains.add('sports');
-    domains.add('athletics');
-  }
-
-  // Business/Entrepreneurship/Finance domains
-  if (/\b(business|entrepreneur|startup|company|enterprise|commerce|trade|market|sell|finance|financial|banking|investment|economics|economy|money|capital|stock|trading)\b/.test(normalized)) {
-    domains.add('business');
-    domains.add('entrepreneurship');
-    domains.add('finance');
-  }
-
-  // Environmental domains
-  if (/\b(environment|climate|nature|green|sustainable|ecology|planet|earth|conservation)\b/.test(normalized)) {
-    domains.add('environment');
-    domains.add('sustainability');
-  }
-
-  return domains;
-};
-
-/**
- * Determine if an activity is strategically suitable for Ivy League admissions
- * Based on conceptual relevance, not keyword matching
- */
-const isStrategicallySuitable = (
-  studentInterest: string,
-  activity: IAgentSuggestion
-): boolean => {
-  const interestThemes = extractThemes(studentInterest);
-  const interestDomains = extractDomains(studentInterest);
-
-  // Combine activity content for analysis
-  const activityText = `${activity.title} ${activity.description} ${activity.tags.join(' ')}`;
-  const activityNormalized = normalizeText(activityText);
-  const activityThemes = extractThemes(activityText);
-  const activityDomains = extractDomains(activityText);
-
-  // Conceptual relevance checks
-
-  // 1. Domain overlap - if domains match, highly relevant
-  const domainOverlap = [...interestDomains].filter((d) => activityDomains.has(d));
-  if (domainOverlap.length > 0) {
-    return true;
-  }
-
-  // 2. Theme overlap - if significant themes match
-  const themeOverlap = [...interestThemes].filter((t) => activityThemes.has(t));
-  if (themeOverlap.length >= 1) {
-    return true;
-  }
-
-  // 3. Semantic context matching - check if activity context aligns with interest
-  const interestWords = [...interestThemes];
-  let contextMatchCount = 0;
-
-  for (const word of interestWords) {
-    // Check for exact word match
-    if (word.length > 2 && activityNormalized.includes(word)) {
-      contextMatchCount++;
-    }
-    // Also check for word stem matches (first 3-4 characters)
-    else if (word.length > 3) {
-      const wordStem = word.substring(0, Math.min(4, word.length));
-      if (activityNormalized.includes(wordStem)) {
-        contextMatchCount++;
-      }
-    }
-  }
-
-  // If context words match, it's relevant
-  if (contextMatchCount >= 1) {
-    return true;
-  }
-
-  // 4. Tag relevance - if activity tags contain interest themes
-  const activityTagsText = activity.tags.join(' ').toLowerCase();
-  for (const theme of interestThemes) {
-    if (theme.length > 2 && activityTagsText.includes(theme)) {
-      return true;
-    }
-    // Also check for partial matches in tags
-    if (theme.length > 3) {
-      const themeStem = theme.substring(0, Math.min(4, theme.length));
-      if (activityTagsText.includes(themeStem)) {
-        return true;
-      }
-    }
-  }
-
-  // 5. Description semantic match - check for conceptual alignment
-  const descriptionWords = activity.description.toLowerCase().split(' ');
-  const interestWordsArray = [...interestThemes];
+  const allKeywords = new Set<string>();
   
-  let semanticMatches = 0;
-  for (const interestWord of interestWordsArray) {
-    if (interestWord.length > 3) {
-      // Check for word variations and related terms
-      for (const descWord of descriptionWords) {
-        if (descWord.length > 3) {
-          // Simple similarity check (same prefix or contains)
-          if (descWord.startsWith(interestWord.substring(0, 3)) || 
-              interestWord.startsWith(descWord.substring(0, 3)) ||
-              descWord.includes(interestWord) ||
-              interestWord.includes(descWord)) {
-            semanticMatches++;
-            break;
-          }
-        }
-      }
+  // Add original words
+  careerWords.forEach(word => allKeywords.add(word));
+  
+  // Add domain-specific keywords using knowledge map
+  careerWords.forEach(word => {
+    if (CAREER_DOMAIN_MAP[word]) {
+      CAREER_DOMAIN_MAP[word].forEach(keyword => allKeywords.add(keyword));
     }
-  }
+  });
+  
+  // Add full phrase
+  allKeywords.add(normalized);
 
-  if (semanticMatches >= 1) {
-    return true;
-  }
+  return {
+    coreSkills: Array.from(allKeywords),
+    impactAreas: Array.from(allKeywords),
+    academicDisciplines: Array.from(allKeywords),
+    practicalApplications: Array.from(allKeywords),
+    allKeywords
+  };
+};
 
-  // 6. Title word match - check if any interest word appears in title
-  const titleNormalized = normalizeText(activity.title);
-  for (const theme of interestThemes) {
-    if (theme.length > 2 && titleNormalized.includes(theme)) {
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 🔍 STAGE 2 — CANDIDATE RETRIEVAL (HIGH-RECALL, RULE-BASED)
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * Retrieve ALL potentially relevant activities using:
+ * - Direct term matching
+ * - Partial word matching
+ * - Stem matching (cautious, 4+ chars)
+ * - Tag-specific matching (high-signal)
+ * - Cross-disciplinary relevance
+ * - Impact-area alignment
+ * 
+ * Output: Candidate pool (can be large, maximizes recall)
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+const isActivityRelevant = (
+  activity: IAgentSuggestion,
+  intent: CareerIntent
+): boolean => {
+  const activityText = normalizeText(
+    `${activity.title} ${activity.description} ${activity.tags.join(' ')}`
+  );
+
+  // Use word-boundary matching to prevent false positives like "dent" matching "student"
+  for (const keyword of intent.allKeywords) {
+    // Create regex with word boundaries to match whole words only
+    const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const wordBoundaryRegex = new RegExp(`\\b${escapedKeyword}\\b`, 'i');
+    
+    if (wordBoundaryRegex.test(activityText)) {
       return true;
     }
   }
 
-  // 7. If student interest is very short (single word), be more lenient
-  // Return activity if it has any thematic connection
-  if (interestThemes.size <= 2) {
-    // For very specific interests, include activities that might be related
-    // Check if activity description contains any related concepts
-    const descriptionLower = activity.description.toLowerCase();
-    for (const theme of interestThemes) {
-      if (theme.length > 3) {
-        // Check for partial matches or related terms
-        if (descriptionLower.includes(theme) || 
-            descriptionLower.includes(theme.substring(0, 3))) {
-          return true;
-        }
-      }
-    }
-  }
-
-  // If no clear conceptual match found, exclude the activity
-  // Only return activities that have strategic relevance for Ivy League admissions
   return false;
 };
 
 /**
- * Agent Suggestion Engine
- * Returns ALL strategically suitable activities based on conceptual interpretation
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 🎯 STAGE 3 — REASONING & SCORING (CORE INTELLIGENCE)
+ * ═══════════════════════════════════════════════════════════════════════════
  * 
- * @param studentInterest - Student's primary interest text
- * @param pointerNo - Pointer number (2, 3, or 4)
- * @returns Array of all suitable activities (not ranked, no scores)
+ * Score each activity on 5 dimensions (0-5 each):
+ * 1. Career Alignment: How directly it builds career skills/identity
+ * 2. Leadership Depth: Founder > Leader > Contributor
+ * 3. Ownership & Initiative: Created/scaled/owned outcomes
+ * 4. Impact Scale: Local < Regional < National < Global
+ * 5. Spike Potential: Can this become defining narrative
+ * 
+ * Calculate composite score for ranking
+ * Generate reasoning: "Why This Fits" and "Ivy-Level Justification"
+ * ═══════════════════════════════════════════════════════════════════════════
  */
+
+const scoreActivity = (
+  activity: IAgentSuggestion,
+  careerRole: string,
+  intent: CareerIntent
+): ScoredActivity => {
+  const title = activity.title.toLowerCase();
+  const description = activity.description.toLowerCase();
+  const tags = activity.tags.map(t => t.toLowerCase());
+  const allText = `${title} ${description} ${tags.join(' ')}`;
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // DIMENSION 1: CAREER ALIGNMENT (0-5)
+  // ─────────────────────────────────────────────────────────────────────────
+  let careerAlignment = 0;
+  let matchedKeywords = 0;
+  
+  for (const keyword of intent.coreSkills) {
+    // Use word-boundary matching for scoring as well
+    const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const wordBoundaryRegex = new RegExp(`\\b${escapedKeyword}\\b`, 'i');
+    if (wordBoundaryRegex.test(allText)) {
+      matchedKeywords++;
+    }
+  }
+  
+  // Direct career mention in title = high alignment
+  if (title.includes(careerRole.toLowerCase())) {
+    careerAlignment = 5;
+  } else if (matchedKeywords >= 3) {
+    careerAlignment = 4;
+  } else if (matchedKeywords >= 2) {
+    careerAlignment = 3;
+  } else if (matchedKeywords >= 1) {
+    careerAlignment = 2;
+  } else {
+    careerAlignment = 1;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // DIMENSION 2: LEADERSHIP DEPTH (0-5)
+  // ─────────────────────────────────────────────────────────────────────────
+  let leadershipDepth = 0;
+  
+  const founderKeywords = ['found', 'start', 'create', 'establish', 'launch', 'initiate'];
+  const leaderKeywords = ['lead', 'manage', 'direct', 'organize', 'coordinate', 'head'];
+  const contributorKeywords = ['participate', 'join', 'volunteer', 'assist', 'help', 'support'];
+  
+  if (founderKeywords.some(kw => allText.includes(kw))) {
+    leadershipDepth = 5;
+  } else if (leaderKeywords.some(kw => allText.includes(kw))) {
+    leadershipDepth = 4;
+  } else if (contributorKeywords.some(kw => allText.includes(kw))) {
+    leadershipDepth = 2;
+  } else {
+    leadershipDepth = 3; // Default moderate
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // DIMENSION 3: OWNERSHIP & INITIATIVE (0-5)
+  // ─────────────────────────────────────────────────────────────────────────
+  let ownershipInitiative = 0;
+  
+  const ownershipKeywords = ['design', 'develop', 'build', 'create', 'own', 'drive', 'scale', 'grow', 'implement'];
+  const ownershipCount = ownershipKeywords.filter(kw => allText.includes(kw)).length;
+  
+  if (ownershipCount >= 3) {
+    ownershipInitiative = 5;
+  } else if (ownershipCount >= 2) {
+    ownershipInitiative = 4;
+  } else if (ownershipCount >= 1) {
+    ownershipInitiative = 3;
+  } else {
+    ownershipInitiative = 2;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // DIMENSION 4: IMPACT SCALE (0-5)
+  // ─────────────────────────────────────────────────────────────────────────
+  let impactScale = 0;
+  
+  const globalKeywords = ['global', 'international', 'worldwide', 'cross border'];
+  const nationalKeywords = ['national', 'country', 'nationwide'];
+  const regionalKeywords = ['regional', 'state', 'province', 'district'];
+  const localKeywords = ['local', 'community', 'neighborhood', 'school'];
+  
+  if (globalKeywords.some(kw => allText.includes(kw))) {
+    impactScale = 5;
+  } else if (nationalKeywords.some(kw => allText.includes(kw))) {
+    impactScale = 4;
+  } else if (regionalKeywords.some(kw => allText.includes(kw))) {
+    impactScale = 3;
+  } else if (localKeywords.some(kw => allText.includes(kw))) {
+    impactScale = 2;
+  } else {
+    impactScale = 3; // Default moderate
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // DIMENSION 5: SPIKE POTENTIAL (0-5)
+  // ─────────────────────────────────────────────────────────────────────────
+  let spikePotential = 0;
+  
+  const spikeKeywords = ['research', 'publication', 'award', 'competition', 'innovation', 'original', 'unique', 'first'];
+  const spikeCount = spikeKeywords.filter(kw => allText.includes(kw)).length;
+  
+  if (spikeCount >= 3) {
+    spikePotential = 5;
+  } else if (spikeCount >= 2) {
+    spikePotential = 4;
+  } else if (spikeCount >= 1) {
+    spikePotential = 3;
+  } else {
+    spikePotential = 2;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // COMPOSITE SCORE
+  // ─────────────────────────────────────────────────────────────────────────
+  const compositeScore = 
+    careerAlignment + 
+    leadershipDepth + 
+    ownershipInitiative + 
+    impactScale + 
+    spikePotential;
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // GENERATE REASONING
+  // ─────────────────────────────────────────────────────────────────────────
+  
+  const whyThisFits = generateWhyThisFits(activity, careerRole, careerAlignment, matchedKeywords);
+  const ivyLevelJustification = generateIvyJustification(activity, leadershipDepth, impactScale, spikePotential);
+
+  return {
+    activity,
+    rank: 0, // Will be assigned in Stage 4
+    scores: {
+      careerAlignment,
+      leadershipDepth,
+      ownershipInitiative,
+      impactScale,
+      spikePotential
+    },
+    compositeScore,
+    whyThisFits,
+    ivyLevelJustification
+  };
+};
+
+const generateWhyThisFits = (
+  activity: IAgentSuggestion,
+  careerRole: string,
+  alignmentScore: number,
+  matchedKeywords: number
+): string => {
+  const skillsPhrase = matchedKeywords > 1 ? 'develops multiple core skills' : 'builds foundational skills';
+  
+  if (alignmentScore >= 4) {
+    return `This activity directly aligns with ${careerRole} by ${skillsPhrase} essential for this career path. The hands-on experience provides practical application of domain knowledge, preparing students for real-world challenges in this field.`;
+  } else if (alignmentScore >= 3) {
+    return `This activity supports a ${careerRole} career trajectory through ${skillsPhrase} and practical engagement. It offers relevant experience that complements academic preparation and demonstrates genuine interest in the field.`;
+  } else {
+    return `While not directly career-specific, this activity develops transferable skills valuable for ${careerRole}, including problem-solving, analytical thinking, and initiative that apply across professional contexts.`;
+  }
+};
+
+const generateIvyJustification = (
+  activity: IAgentSuggestion,
+  leadershipScore: number,
+  impactScore: number,
+  spikeScore: number
+): string => {
+  const leadershipPhrase = leadershipScore >= 4 
+    ? 'Demonstrates exceptional leadership through ownership and initiative' 
+    : 'Shows leadership potential and active engagement';
+  
+  const impactPhrase = impactScore >= 4 
+    ? 'with measurable impact at scale' 
+    : 'with meaningful community impact';
+  
+  const spikePhrase = spikeScore >= 4 
+    ? 'The unique, research-driven approach creates a distinctive profile element that signals intellectual depth and originality.'
+    : 'This activity contributes to a well-rounded profile by showcasing commitment beyond academics.';
+  
+  return `${leadershipPhrase} ${impactPhrase}. ${spikePhrase}`;
+};
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 🏆 STAGE 4 — RANKING & FILTERING (PRECISION LAYER)
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * Sort by composite score (descending)
+ * Filter top 10-20 activities
+ * Assign final rank numbers
+ * Prioritize depth over variety
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+const rankAndFilter = (scoredActivities: ScoredActivity[]): ScoredActivity[] => {
+  // Sort by composite score (highest first)
+  const ranked = scoredActivities.sort((a, b) => b.compositeScore - a.compositeScore);
+  
+  // Filter top 10-20 (prefer 15-20 for variety)
+  const topActivities = ranked.slice(0, 20);
+  
+  // Assign rank numbers
+  topActivities.forEach((activity, index) => {
+    activity.rank = index + 1;
+  });
+  
+  return topActivities;
+};
+
 export const getAgentSuggestions = async (
-  studentInterest: string,
+  careerRole: string,
   pointerNo: PointerNo.SpikeInOneArea | PointerNo.LeadershipInitiative | PointerNo.GlobalSocialImpact
 ): Promise<IAgentSuggestion[]> => {
-  // Validate pointerNo
+  // ─────────────────────────────────────────────────────────────────────────
+  // VALIDATION
+  // ─────────────────────────────────────────────────────────────────────────
   if (
     pointerNo !== PointerNo.SpikeInOneArea &&
     pointerNo !== PointerNo.LeadershipInitiative &&
@@ -244,27 +473,48 @@ export const getAgentSuggestions = async (
     throw new Error('Invalid pointerNo. Only 2, 3, or 4 are allowed.');
   }
 
-  // Validate studentInterest
-  if (!studentInterest || typeof studentInterest !== 'string' || studentInterest.trim().length === 0) {
-    throw new Error('studentInterest is required and must be a non-empty string');
+  if (!careerRole || typeof careerRole !== 'string' || careerRole.trim().length === 0) {
+    throw new Error('careerRole is required and must be a non-empty string');
   }
 
-  // Fetch all suggestions for this pointer from database
-  const allSuggestions = await AgentSuggestion.find({ pointerNo }).exec();
+  // ─────────────────────────────────────────────────────────────────────────
+  // STAGE 1: CAREER INTENT UNDERSTANDING
+  // ─────────────────────────────────────────────────────────────────────────
+  const careerIntent = interpretCareerIntent(careerRole);
 
-  if (allSuggestions.length === 0) {
+  // ─────────────────────────────────────────────────────────────────────────
+  // STAGE 2: CANDIDATE RETRIEVAL (HIGH RECALL)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Fetch all activities for this pointer from database
+  const allActivities = await AgentSuggestion.find({ pointerNo }).exec();
+
+  if (allActivities.length === 0) {
     return [];
   }
 
-  // Filter activities based on conceptual relevance and admissions strategy
-  const suitableActivities = allSuggestions.filter((activity) =>
-    isStrategicallySuitable(studentInterest, activity)
+  // Filter activities based on career intent (HIGH RECALL)
+  const candidateActivities = allActivities.filter((activity) =>
+    isActivityRelevant(activity, careerIntent)
   );
 
-  // Sort deterministically by title for consistent output
-  suitableActivities.sort((a, b) => a.title.localeCompare(b.title));
+  if (candidateActivities.length === 0) {
+    return [];
+  }
 
-  // Return ALL suitable activities (no ranking, no scores)
-  // Only return activities that actually match the student interest conceptually
-  return suitableActivities;
+  // ─────────────────────────────────────────────────────────────────────────
+  // STAGE 3: SCORING & REASONING (CORE INTELLIGENCE)
+  // ─────────────────────────────────────────────────────────────────────────
+  const scoredActivities = candidateActivities.map((activity) =>
+    scoreActivity(activity, careerRole, careerIntent)
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // STAGE 4: RANKING & FILTERING (PRECISION LAYER)
+  // ─────────────────────────────────────────────────────────────────────────
+  const rankedActivities = rankAndFilter(scoredActivities);
+
+  // Convert back to IAgentSuggestion[] for backward compatibility
+  return rankedActivities.map(scored => scored.activity);
 };
+

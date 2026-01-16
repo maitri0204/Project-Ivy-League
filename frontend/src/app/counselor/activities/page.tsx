@@ -68,7 +68,7 @@ function ActivitiesContent() {
   const studentIvyServiceId = searchParams.get('studentIvyServiceId');
   const counselorId = searchParams.get('counselorId') || '695b93a44df1114a001dc23d';
 
-  const [studentInterest, setStudentInterest] = useState<string>('');
+  const [careerRole, setCareerRole] = useState<string>('');
   const [selectedPointer, setSelectedPointer] = useState<number | ''>(() => {
     const p = searchParams.get('pointerNo');
     return p ? parseInt(p) : 2;
@@ -134,7 +134,7 @@ function ActivitiesContent() {
       try {
         const serviceResponse = await axios.get(`http://localhost:5000/api/ivy-service/${studentIvyServiceId}`);
         if (serviceResponse.data.success && serviceResponse.data.data.studentInterest) {
-          setStudentInterest(serviceResponse.data.data.studentInterest);
+          setCareerRole(serviceResponse.data.data.studentInterest);
         }
 
         const studentId = searchParams.get('studentId');
@@ -171,8 +171,8 @@ function ActivitiesContent() {
   }, [studentIvyServiceId, searchParams]);
 
   const handleFetchSuggestions = async () => {
-    if (!studentInterest.trim()) {
-      setMessage({ type: 'error', text: 'Please enter student interest' });
+    if (!careerRole.trim()) {
+      setMessage({ type: 'error', text: 'Please enter career role' });
       return;
     }
 
@@ -186,14 +186,14 @@ function ActivitiesContent() {
 
     try {
       await axios.put(`http://localhost:5000/api/ivy-service/${studentIvyServiceId}/interest`, {
-        interest: studentInterest.trim()
+        interest: careerRole.trim()
       });
 
       const response = await axios.get<AgentSuggestion[]>(
         `http://localhost:5000/api/agent-suggestions`,
         {
           params: {
-            studentInterest: studentInterest.trim(),
+            careerRole: careerRole.trim(),
             pointerNo: selectedPointer,
           },
         }
@@ -219,11 +219,11 @@ function ActivitiesContent() {
 
   // Auto-fetch suggestions logic
   useEffect(() => {
-    if (studentInterest && selectedPointer && !loading) {
+    if (careerRole && selectedPointer && !loading) {
       handleFetchSuggestions();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPointer, studentInterest]);
+  }, [selectedPointer, careerRole]);
 
   const handleToggleActivity = (activityId: string) => {
     const newSelected = new Set(selectedActivities);
@@ -384,26 +384,26 @@ function ActivitiesContent() {
               </h2>
             </div>
 
-            {/* Student Interest Input */}
+            {/* Career Role Input */}
             <div className="mb-6">
               <label
-                htmlFor="studentInterest"
+                htmlFor="careerRole"
                 className="block text-sm font-medium text-gray-700 mb-2"
               >
-                Student Interest for {getPointerLabel(selectedPointer as number)}
+                Career Role for {getPointerLabel(selectedPointer as number)}
               </label>
               <div className="flex gap-2">
                 <textarea
-                  id="studentInterest"
-                  value={studentInterest}
-                  onChange={(e) => setStudentInterest(e.target.value)}
+                  id="careerRole"
+                  value={careerRole}
+                  onChange={(e) => setCareerRole(e.target.value)}
                   rows={3}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white resize-y"
-                  placeholder="Enter specific interest for this pointer (e.g., 'Robotics', 'Debate')..."
+                  placeholder="Enter career role for this pointer (e.g., 'Doctor', 'Engineer', 'Finance')..."
                 />
                 <button
                   onClick={handleFetchSuggestions}
-                  disabled={loading || !studentInterest.trim()}
+                  disabled={loading || !careerRole.trim()}
                   className="self-start px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed h-[86px]"
                 >
                   {loading ? '...' : 'Save & Get Suggestions'}
@@ -491,9 +491,9 @@ function ActivitiesContent() {
                       </button>
                     )}
                   </div>
-                ) : studentInterest ? (
+                ) : careerRole ? (
                   <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                    No suggestions found. Try a different interest keyword or ensure database has activities for this pointer.
+                    No suggestions found. Try a different career role or ensure database has activities for this pointer.
                   </div>
                 ) : null}
               </div>
