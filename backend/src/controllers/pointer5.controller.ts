@@ -200,7 +200,7 @@ export const getStatusHandler = async (req: Request, res: Response): Promise<voi
     const { studentIvyServiceId } = req.query;
 
     // Support both studentId in params and studentIvyServiceId in query
-    const identifier = studentIvyServiceId ? (studentIvyServiceId as string) : studentId;
+    const identifier = studentIvyServiceId ? (studentIvyServiceId as string) : (studentId as string);
     const useServiceId = !!studentIvyServiceId;
 
     if (!identifier) {
@@ -238,7 +238,7 @@ export const serveFileHandler = async (req: Request, res: Response): Promise<voi
 
     // Security: prevent directory traversal
     // Remove any leading slashes and normalize
-    let safePath = filePath.replace(/^\/+/, ''); // Remove leading slashes
+    let safePath = (filePath as string).replace(/^\/+/, ''); // Remove leading slashes
     safePath = path.normalize(safePath).replace(/^(\.\.[\/\\])+/, ''); // Prevent ../
 
     // Ensure path is within uploads directory

@@ -97,7 +97,7 @@ export const getStudentActivitiesHandler = async (req: Request, res: Response): 
       return;
     }
 
-    const activities = await getStudentActivities(studentId);
+    const activities = await getStudentActivities(studentId as string);
 
     res.status(200).json({
       success: true,

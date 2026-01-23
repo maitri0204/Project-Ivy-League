@@ -76,7 +76,7 @@ export const getStudentActivitiesHandler = async (req: Request, res: Response): 
     const { studentId } = req.params;
     const { studentIvyServiceId, includeInvisible } = req.query;
 
-    const identifier = studentIvyServiceId ? (studentIvyServiceId as string) : studentId;
+    const identifier = studentIvyServiceId ? (studentIvyServiceId as string) : (studentId as string);
     const useServiceId = !!studentIvyServiceId;
 
     if (!identifier) {

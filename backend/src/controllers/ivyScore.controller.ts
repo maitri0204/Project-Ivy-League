@@ -16,7 +16,7 @@ export const getStudentIvyScore = async (req: Request, res: Response) => {
             });
         }
 
-        const scoreCard = await getIvyScore(studentId);
+        const scoreCard = await getIvyScore(studentId as string);
 
         return res.status(200).json({
             success: true,
@@ -46,7 +46,7 @@ export const recalculateIvyScore = async (req: Request, res: Response) => {
             });
         }
 
-        const scoreCard = await calculateIvyScore(studentId);
+        const scoreCard = await calculateIvyScore(studentId as string);
 
         return res.status(200).json({
             success: true,

@@ -40,7 +40,7 @@ export const getStudentsForCounselorHandler = async (req: Request, res: Response
       return;
     }
 
-    const students = await getStudentsForCounselor(counselorId);
+    const students = await getStudentsForCounselor(counselorId as string);
 
     res.status(200).json({
       success: true,
@@ -64,7 +64,7 @@ export const updateInterestHandler = async (req: Request, res: Response): Promis
       return;
     }
 
-    const updatedService = await updateStudentInterest(serviceId, interest);
+    const updatedService = await updateStudentInterest(serviceId as string, interest);
 
     res.status(200).json({
       success: true,
@@ -81,7 +81,7 @@ export const updateInterestHandler = async (req: Request, res: Response): Promis
 export const getServiceDetailsHandler = async (req: Request, res: Response): Promise<void> => {
   try {
     const { serviceId } = req.params;
-    const service = await getStudentIvyServiceById(serviceId);
+    const service = await getStudentIvyServiceById(serviceId as string);
 
     if (!service) {
       res.status(404).json({ success: false, message: 'Service not found' });

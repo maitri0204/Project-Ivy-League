@@ -167,7 +167,7 @@ export const getPointer6StatusHandler = async (req: Request, res: Response): Pro
     const { studentId } = req.params;
     const { studentIvyServiceId } = req.query;
 
-    const identifier = studentIvyServiceId ? (studentIvyServiceId as string) : studentId;
+    const identifier = studentIvyServiceId ? (studentIvyServiceId as string) : (studentId as string);
     const useServiceId = !!studentIvyServiceId;
 
     if (!identifier) {
@@ -214,7 +214,7 @@ export const replaceCertificateHandler = async (req: Request, res: Response): Pr
       return;
     }
 
-    const certificate = await replaceCertificate(certificateId, studentId as string, req.file);
+    const certificate = await replaceCertificate(certificateId as string, studentId as string, req.file);
 
     res.status(200).json({
       success: true,
@@ -249,7 +249,7 @@ export const deleteCertificateHandler = async (req: Request, res: Response): Pro
       return;
     }
 
-    await deleteCertificate(certificateId, studentId as string);
+    await deleteCertificate(certificateId as string, studentId as string);
 
     res.status(200).json({
       success: true,
@@ -284,7 +284,7 @@ export const evaluateCertificateHandler = async (req: Request, res: Response): P
     }
 
     const evaluation = await evaluateCertificate(
-      certificateId,
+      certificateId as string,
       counselorId as string,
       Number(score),
       feedback

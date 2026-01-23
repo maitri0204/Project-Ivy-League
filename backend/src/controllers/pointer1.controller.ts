@@ -88,7 +88,7 @@ export const getAcademicStatusHandler = async (req: Request, res: Response): Pro
         const { studentId } = req.params;
         const { studentIvyServiceId } = req.query;
 
-        const identifier = studentIvyServiceId ? (studentIvyServiceId as string) : studentId;
+        const identifier = studentIvyServiceId ? (studentIvyServiceId as string) : (studentId as string);
         const useServiceId = !!studentIvyServiceId;
 
         if (!identifier) {
