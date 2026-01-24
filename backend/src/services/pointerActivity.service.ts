@@ -71,10 +71,37 @@ export const selectActivities = async (
   pointerNo: number,
   agentSuggestionIds: string[],
   isVisibleToStudent: boolean = true,
+  weightages?: number[],
 ) => {
   ensureAllowedPointer(pointerNo);
   if (!agentSuggestionIds || agentSuggestionIds.length === 0) {
     throw new Error('agentSuggestionIds is required');
+  }
+
+  // Validate weightages for Pointer 2
+  if (pointerNo === PointerNo.SpikeInOneArea) {
+    if (agentSuggestionIds.length === 1) {
+      // Auto-assign 100 for single activity
+      weightages = [100];
+    } else if (weightages && weightages.length > 0) {
+      // Multiple activities - validate weightages
+      if (weightages.length !== agentSuggestionIds.length) {
+        throw new Error('Weightages array must match the number of activities');
+      }
+      
+      // Validate each weightage
+      for (const w of weightages) {
+        if (typeof w !== 'number' || w < 0 || w > 100) {
+          throw new Error('Each weightage must be a number between 0 and 100');
+        }
+      }
+      
+      // Validate sum equals 100
+      const sum = weightages.reduce((acc, w) => acc + w, 0);
+      if (Math.abs(sum - 100) > 0.01) {
+        throw new Error(`Total weightage must equal 100, got ${sum}`);
+      }
+    }
   }
 
   const service = await StudentIvyService.findById(ensureObjectId(studentIvyServiceId, 'studentIvyServiceId'));
@@ -139,14 +166,25 @@ export const selectActivities = async (
 
     if (existing) {
       existing.isVisibleToStudent = isVisibleToStudent;
+      // Update weightage for Pointer 2
+      if (pointerNo === PointerNo.SpikeInOneArea && weightages) {
+        const index = agentSuggestionIds.indexOf(agentSuggestionId);
+        if (index !== -1 && weightages[index] !== undefined) {
+          existing.weightage = weightages[index];
+        }
+      }
       await existing.save();
       updatedSelections.push(existing);
     } else {
+      const index = agentSuggestionIds.indexOf(agentSuggestionId);
       const created = await CounselorSelectedSuggestion.create({
         studentIvyServiceId: service._id,
         agentSuggestionId: ensureObjectId(agentSuggestionId, 'agentSuggestionId'),
         pointerNo,
         isVisibleToStudent,
+        ...(pointerNo === PointerNo.SpikeInOneArea && weightages && weightages[index] !== undefined 
+          ? { weightage: weightages[index] } 
+          : {}),
       });
       updatedSelections.push(created);
     }
@@ -358,6 +396,7 @@ export const getStudentActivities = async (
       isVisibleToStudent: sel.isVisibleToStudent,
       suggestion: suggestionMap.get(sel.agentSuggestionId.toString()),
       selectedAt: sel.selectedAt,
+      weightage: sel.weightage, // Include weightage for Pointer 2
       proofUploaded: !!submission,
       evaluated: !!evaluation,
       submission: submission

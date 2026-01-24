@@ -5,6 +5,7 @@ import {
   uploadProofHandler,
   uploadProofMiddleware,
   evaluateActivityHandler,
+  updateWeightagesHandler,
 } from '../controllers/pointer234Activity.controller';
 
 const router = Router();
@@ -19,6 +20,9 @@ router.post('/activity/select', selectActivitiesHandler);
 
 // GET /pointer/activity/student/:studentId - Get student activities
 router.get('/activity/student/:studentId', getStudentActivitiesHandler);
+
+// PUT /pointer/activity/weightages - Counselor updates weightages
+router.put('/activity/weightages', updateWeightagesHandler);
 
 // POST /pointer/activity/proof/upload - Student uploads proof
 router.post('/activity/proof/upload', uploadProofMiddleware, uploadProofHandler);

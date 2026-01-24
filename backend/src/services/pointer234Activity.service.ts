@@ -37,13 +37,14 @@ export const saveFile = async (file: Express.Multer.File, subfolder: string): Pr
 
 /**
  * Select activities (Counselor only)
- * Input: studentIvyServiceId, counselorId, agentSuggestionIds (array), pointerNo (2|3|4)
+ * Input: studentIvyServiceId, counselorId, agentSuggestionIds (array), pointerNo (2|3|4), weightages (optional for Pointer 2)
  */
 export const selectActivities = async (
   studentIvyServiceId: string,
   counselorId: string,
   agentSuggestionIds: string[],
-  pointerNo: PointerNo
+  pointerNo: PointerNo,
+  weightages?: number[] // Optional weightages for Pointer 2
 ): Promise<ICounselorSelectedSuggestion[]> => {
   // Validate studentIvyServiceId
   if (!mongoose.Types.ObjectId.isValid(studentIvyServiceId)) {
@@ -63,6 +64,32 @@ export const selectActivities = async (
   // Validate agentSuggestionIds
   if (!Array.isArray(agentSuggestionIds) || agentSuggestionIds.length === 0) {
     throw new Error('agentSuggestionIds must be a non-empty array');
+  }
+
+  // Validate weightages for Pointer 2
+  if (pointerNo === PointerNo.SpikeInOneArea) {
+    if (agentSuggestionIds.length === 1) {
+      // Auto-assign 100 for single activity
+      weightages = [100];
+    } else {
+      // Multiple activities require weightages
+      if (!weightages || !Array.isArray(weightages) || weightages.length !== agentSuggestionIds.length) {
+        throw new Error('Weightages array must match the number of activities for Pointer 2');
+      }
+      
+      // Validate each weightage is a positive number
+      for (const w of weightages) {
+        if (typeof w !== 'number' || w <= 0 || w > 100) {
+          throw new Error('Each weightage must be a number between 0 and 100');
+        }
+      }
+      
+      // Validate sum equals 100
+      const sum = weightages.reduce((acc, w) => acc + w, 0);
+      if (Math.abs(sum - 100) > 0.01) { // Allow small floating point tolerance
+        throw new Error(`Total weightage must equal 100, got ${sum}`);
+      }
+    }
   }
 
   // Verify studentIvyService exists and counselor matches
@@ -97,13 +124,14 @@ export const selectActivities = async (
     pointerNo,
   });
 
-  // Create new selections
+  // Create new selections with weightages for Pointer 2
   const selectedActivities = await CounselorSelectedSuggestion.insertMany(
-    agentSuggestionIds.map((agentSuggestionId) => ({
+    agentSuggestionIds.map((agentSuggestionId, index) => ({
       studentIvyServiceId: new mongoose.Types.ObjectId(studentIvyServiceId),
       agentSuggestionId: new mongoose.Types.ObjectId(agentSuggestionId),
       pointerNo,
       isVisibleToStudent: true, // Auto-visible when selected
+      ...(pointerNo === PointerNo.SpikeInOneArea && weightages ? { weightage: weightages[index] } : {}),
     }))
   );
 
@@ -159,6 +187,7 @@ export const getStudentActivities = async (studentId: string): Promise<any[]> =>
       description: agentSuggestion.description,
       tags: agentSuggestion.tags || [],
       selectedAt: selected.selectedAt,
+      weightage: selected.weightage, // Include weightage for Pointer 2
       proofUploaded: !!submission,
       submission: submission
         ? {
@@ -378,6 +407,101 @@ export const evaluateActivity = async (
   await refreshPointerAverageScore(service._id.toString(), pointerNo);
 
   return finalEvaluation!;
+};
+
+/**
+ * Update weightages for selected activities (Counselor only)
+ * Input: studentIvyServiceId, counselorId, weightages map { agentSuggestionId: weightage }, pointerNo
+ */
+export const updateWeightages = async (
+  studentIvyServiceId: string,
+  counselorId: string,
+  weightages: { [agentSuggestionId: string]: number },
+  pointerNo?: number
+): Promise<ICounselorSelectedSuggestion[]> => {
+  // Validate studentIvyServiceId
+  if (!mongoose.Types.ObjectId.isValid(studentIvyServiceId)) {
+    throw new Error('Invalid studentIvyServiceId');
+  }
+
+  // Validate counselorId
+  if (!mongoose.Types.ObjectId.isValid(counselorId)) {
+    throw new Error('Invalid counselorId');
+  }
+
+  // Verify studentIvyService exists and counselor matches
+  const service = await StudentIvyService.findById(studentIvyServiceId);
+  if (!service) {
+    throw new Error('Student Ivy Service not found');
+  }
+
+  if (service.counselorId.toString() !== counselorId) {
+    throw new Error('Unauthorized: Counselor does not match this service');
+  }
+
+  // Verify counselor role
+  const counselor = await User.findById(counselorId);
+  if (!counselor || counselor.role !== USER_ROLE.COUNSELOR) {
+    throw new Error('Unauthorized: User is not a counselor');
+  }
+
+  // Build query for selected activities - all pointers 2, 3, 4 or specific pointer
+  const query: any = { studentIvyServiceId };
+  if (pointerNo && [2, 3, 4].includes(pointerNo)) {
+    query.pointerNo = pointerNo;
+  } else {
+    // Update for all pointers 2, 3, 4
+    query.pointerNo = { $in: [PointerNo.SpikeInOneArea, PointerNo.LeadershipInitiative, PointerNo.GlobalSocialImpact] };
+  }
+
+  const selectedActivities = await CounselorSelectedSuggestion.find(query);
+
+  if (selectedActivities.length === 0) {
+    throw new Error('No activities selected');
+  }
+
+  // Filter activities to only those in the weightages object
+  const activitiesToUpdate = selectedActivities.filter(act => 
+    weightages[act.agentSuggestionId.toString()] !== undefined
+  );
+
+  if (activitiesToUpdate.length === 0) {
+    throw new Error('No matching activities found for provided weightages');
+  }
+
+  // Validate weightages sum to 100 for the activities being updated
+  const weightageValues = activitiesToUpdate.map(act => weightages[act.agentSuggestionId.toString()]);
+  if (activitiesToUpdate.length === 1) {
+    // Single activity must have 100
+    if (weightageValues[0] !== 100) {
+      throw new Error('Single activity must have weightage of 100');
+    }
+  } else {
+    // Multiple activities must sum to 100
+    const sum = weightageValues.reduce((acc, w) => acc + w, 0);
+    if (Math.abs(sum - 100) > 0.01) {
+      throw new Error(`Total weightage must equal 100, got ${sum.toFixed(2)}`);
+    }
+
+    // Each weightage must be valid
+    for (const w of weightageValues) {
+      if (typeof w !== 'number' || w <= 0 || w > 100) {
+        throw new Error('Each weightage must be a number between 0 and 100');
+      }
+    }
+  }
+
+  // Update weightages
+  const updatedActivities = [];
+  for (const activity of activitiesToUpdate) {
+    const agentSuggestionId = activity.agentSuggestionId.toString();
+    activity.weightage = weightages[agentSuggestionId];
+    await activity.save();
+    updatedActivities.push(activity);
+  }
+
+  console.log(`Updated ${updatedActivities.length} activities with weightages`);
+  return updatedActivities;
 };
 
 /**

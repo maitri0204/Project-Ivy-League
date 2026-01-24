@@ -4,6 +4,7 @@ import {
   getStudentActivities,
   uploadProof,
   evaluateActivity,
+  updateWeightages,
 } from '../services/pointer234Activity.service';
 import multer from 'multer';
 import { PointerNo } from '../types/PointerNo';
@@ -23,7 +24,7 @@ const upload = multer({
  */
 export const selectActivitiesHandler = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { studentIvyServiceId, agentSuggestionIds, pointerNo } = req.body;
+    const { studentIvyServiceId, agentSuggestionIds, pointerNo, weightages } = req.body;
     const counselorId = req.body.counselorId || req.headers['user-id']; // Get from body or header
 
     if (!studentIvyServiceId) {
@@ -62,7 +63,8 @@ export const selectActivitiesHandler = async (req: Request, res: Response): Prom
       studentIvyServiceId,
       counselorId as string,
       agentSuggestionIds,
-      Number(pointerNo) as PointerNo
+      Number(pointerNo) as PointerNo,
+      weightages // Pass weightages to service
     );
 
     res.status(200).json({
@@ -228,6 +230,57 @@ export const evaluateActivityHandler = async (req: Request, res: Response): Prom
     res.status(400).json({
       success: false,
       message: error.message || 'Failed to evaluate activity',
+    });
+  }
+};
+
+/**
+ * PUT /pointer/activity/weightages
+ * Counselor updates weightages for selected activities
+ */
+export const updateWeightagesHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { studentIvyServiceId, weightages, pointerNo } = req.body;
+    const counselorId = req.body.counselorId || req.headers['user-id'];
+
+    if (!studentIvyServiceId) {
+      res.status(400).json({
+        success: false,
+        message: 'studentIvyServiceId is required',
+      });
+      return;
+    }
+
+    if (!weightages || typeof weightages !== 'object') {
+      res.status(400).json({
+        success: false,
+        message: 'weightages object is required',
+      });
+      return;
+    }
+
+    if (!counselorId) {
+      res.status(400).json({
+        success: false,
+        message: 'counselorId is required',
+      });
+      return;
+    }
+
+    const updated = await updateWeightages(studentIvyServiceId, counselorId as string, weightages, pointerNo);
+
+    res.status(200).json({
+      success: true,
+      message: 'Weightages updated successfully',
+      data: {
+        count: updated.length,
+      },
+    });
+  } catch (error: any) {
+    console.error('Update weightages error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to update weightages',
     });
   }
 };

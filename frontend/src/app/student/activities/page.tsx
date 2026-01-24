@@ -39,6 +39,7 @@ interface StudentActivity {
   description: string;
   tags: string[];
   selectedAt: string;
+  weightage?: number; // Weightage for Pointers 2, 3, 4
   proofUploaded: boolean;
   submission: {
     _id: string;
@@ -255,7 +256,14 @@ function ActivitiesContent() {
                 className="border border-gray-200 rounded-lg p-6"
               >
                 <div className="mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{activity.title}</h3>
+                  <div className="flex items-start justify-between gap-4 mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900 flex-1">{activity.title}</h3>
+                    {activity.weightage !== undefined && activity.weightage !== null && (
+                      <div className="flex-shrink-0 px-3 py-1.5 bg-gradient-to-r from-orange-100 to-amber-100 border-2 border-orange-400 rounded-lg">
+                        <span className="text-sm font-bold text-orange-900">Weightage: {activity.weightage}%</span>
+                      </div>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-500 mb-2">
                     {getPointerLabel(activity.pointerNo)}
                   </p>

@@ -6,6 +6,7 @@ export interface ICounselorSelectedSuggestion extends Document {
   agentSuggestionId: mongoose.Types.ObjectId;
   pointerNo: PointerNo;
   isVisibleToStudent: boolean;
+  weightage?: number; // Weightage for Pointer 2 activities (sum should be 100)
   selectedAt?: Date;
 }
 
@@ -15,6 +16,7 @@ const counselorSelectedSuggestionSchema = new Schema<ICounselorSelectedSuggestio
   // Restrict enum to numeric PointerNo values only to avoid string variants from TS enums
   pointerNo: { type: Number, enum: Object.values(PointerNo).filter(v => typeof v === 'number') as number[], required: true },
   isVisibleToStudent: { type: Boolean, default: false, required: true },
+  weightage: { type: Number, min: 0, max: 100 }, // Optional weightage for Pointer 2
   selectedAt: { type: Date, default: Date.now },
 });
 

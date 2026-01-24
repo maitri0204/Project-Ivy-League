@@ -19,7 +19,7 @@ export const proofUploadMiddleware = upload.array('proofFiles', 5);
 
 export const selectActivitiesHandler = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { studentIvyServiceId, counselorId: counselorIdFromBody, pointerNo, agentSuggestionIds, isVisibleToStudent } =
+    const { studentIvyServiceId, counselorId: counselorIdFromBody, pointerNo, agentSuggestionIds, isVisibleToStudent, weightages } =
       req.body;
     const counselorId = counselorIdFromBody || req.headers['user-id'];
 
@@ -46,6 +46,7 @@ export const selectActivitiesHandler = async (req: Request, res: Response): Prom
       Number(pointerNo),
       agentSuggestionIds,
       isVisibleToStudent !== false, // default true
+      weightages, // Pass weightages array
     );
 
     res.status(200).json({

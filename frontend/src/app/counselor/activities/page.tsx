@@ -47,6 +47,7 @@ interface StudentActivity {
   description: string;
   tags: string[];
   selectedAt: string;
+  weightage?: number; // Weightage for Pointers 2, 3, 4
   proofUploaded: boolean;
   submission: {
     _id: string;
@@ -82,6 +83,7 @@ function ActivitiesContent() {
   }, [searchParams]);
   const [suggestions, setSuggestions] = useState<AgentSuggestion[]>([]);
   const [selectedActivities, setSelectedActivities] = useState<Set<string>>(new Set());
+  const [activityWeightages, setActivityWeightages] = useState<Record<string, number>>({});
   const [studentActivities, setStudentActivities] = useState<StudentActivity[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [loadingActivities, setLoadingActivities] = useState<boolean>(false);
@@ -111,9 +113,24 @@ function ActivitiesContent() {
         }));
 
         setStudentActivities(activitiesData);
+        
+        // Load weightages from database
+        const weightagesFromDb: Record<string, number> = {};
+        activitiesData.forEach((act: StudentActivity) => {
+          if (act.suggestion?._id && act.weightage !== undefined && act.weightage !== null) {
+            weightagesFromDb[act.suggestion._id] = act.weightage;
+          }
+        });
+        setActivityWeightages(prev => ({ ...prev, ...weightagesFromDb }));
       }
     } catch (error: any) {
       console.error('Error fetching student activities:', error);
+      console.error('Error details:', {
+        url: `http://localhost:5000/api/pointer/activity/student/${studentId}`,
+        status: error.response?.status,
+        message: error.message
+      });
+      // Don't show error to user if student simply has no activities yet
     } finally {
       setLoadingActivities(false);
     }
@@ -139,25 +156,39 @@ function ActivitiesContent() {
 
         const studentId = searchParams.get('studentId');
         if (studentId) {
-          const activitiesResponse = await axios.get(`http://localhost:5000/api/pointer/activity/student/${studentId}`);
-          if (activitiesResponse.data.success) {
-            const payload = activitiesResponse.data.data;
-            const rawActivities = payload && Array.isArray(payload.activities) ? payload.activities : [];
+          try {
+            const activitiesResponse = await axios.get(`http://localhost:5000/api/pointer/activity/student/${studentId}`);
+            if (activitiesResponse.data.success) {
+              const payload = activitiesResponse.data.data;
+              const rawActivities = payload && Array.isArray(payload.activities) ? payload.activities : [];
 
-            const activitiesData = rawActivities.map((act: any) => ({
-              ...act,
-              title: act.suggestion?.title || 'Untitled Activity',
-              description: act.suggestion?.description || '',
-              tags: act.suggestion?.tags || []
-            }));
+              const activitiesData = rawActivities.map((act: any) => ({
+                ...act,
+                title: act.suggestion?.title || 'Untitled Activity',
+                description: act.suggestion?.description || '',
+                tags: act.suggestion?.tags || []
+              }));
 
-            setStudentActivities(activitiesData);
+              setStudentActivities(activitiesData);
 
-            const assignedIds = new Set<string>();
-            activitiesData.forEach((act: StudentActivity) => {
-              if (act.suggestion?._id) assignedIds.add(act.suggestion._id);
-            });
-            setSelectedActivities(assignedIds);
+              const assignedIds = new Set<string>();
+              const weightagesFromDb: Record<string, number> = {};
+              activitiesData.forEach((act: StudentActivity) => {
+                if (act.suggestion?._id) {
+                  assignedIds.add(act.suggestion._id);
+                  // Load weightage from database if available
+                  if (act.weightage !== undefined && act.weightage !== null) {
+                    weightagesFromDb[act.suggestion._id] = act.weightage;
+                  }
+                }
+              });
+              setSelectedActivities(assignedIds);
+              setActivityWeightages(weightagesFromDb);
+            }
+          } catch (activityError: any) {
+            console.error("Error fetching activities:", activityError);
+            // Don't fail the whole init if activities fetch fails
+            // Student might not have any activities yet
           }
         }
       } catch (error) {
@@ -227,12 +258,76 @@ function ActivitiesContent() {
 
   const handleToggleActivity = (activityId: string) => {
     const newSelected = new Set(selectedActivities);
+    const updatedWeightages = { ...activityWeightages };
+    
     if (newSelected.has(activityId)) {
+      // Removing activity
       newSelected.delete(activityId);
+      delete updatedWeightages[activityId];
     } else {
+      // Adding activity
       newSelected.add(activityId);
+      // Auto-assign weightage for Pointers 2, 3, 4
+      if ([2, 3, 4].includes(selectedPointer as number)) {
+        if (newSelected.size === 1) {
+          updatedWeightages[activityId] = 100;
+        } else {
+          // Distribute evenly
+          const equalWeight = Math.floor(100 / newSelected.size);
+          const remainder = 100 - (equalWeight * newSelected.size);
+          let index = 0;
+          newSelected.forEach(actId => {
+            updatedWeightages[actId] = index === 0 ? equalWeight + remainder : equalWeight;
+            index++;
+          });
+        }
+      }
     }
+    
     setSelectedActivities(newSelected);
+    setActivityWeightages(updatedWeightages);
+  };
+
+  const handleWeightageChange = async (id: string, value: string) => {
+    const numValue = parseFloat(value) || 0;
+    const newWeightages = { ...activityWeightages, [id]: numValue };
+    setActivityWeightages(newWeightages);
+    
+    // Auto-save weightages to database
+    if ([2, 3, 4].includes(selectedPointer as number) && studentIvyServiceId) {
+      try {
+        // Prepare weightages object for all selected activities
+        const weightagesPayload: Record<string, number> = {};
+        selectedActivities.forEach(actId => {
+          weightagesPayload[actId] = newWeightages[actId] || 0;
+        });
+
+        await axios.put('http://localhost:5000/api/pointer/activity/weightages', {
+          studentIvyServiceId,
+          counselorId,
+          weightages: weightagesPayload,
+        });
+      } catch (error) {
+        console.error('Error saving weightages:', error);
+      }
+    }
+  };
+
+  const getTotalWeightage = () => {
+    // Only sum weightages for currently selected activities in current pointer suggestions
+    const currentSuggestionIds = new Set(suggestions.map(s => s._id));
+    return Array.from(selectedActivities)
+      .filter(id => currentSuggestionIds.has(id))
+      .reduce((sum, id) => sum + (activityWeightages[id] || 0), 0);
+  };
+
+  const isWeightageValid = () => {
+    if (![2, 3, 4].includes(selectedPointer as number)) return true;
+    if (currentPointerSelectionCount === 0) return true;
+    if (currentPointerSelectionCount === 1) return true;
+    
+    const total = getTotalWeightage();
+    return Math.abs(total - 100) < 0.01;
   };
 
   const handleSelectActivities = async () => {
@@ -255,19 +350,35 @@ function ActivitiesContent() {
       return;
     }
 
+    // Validate weightages for Pointers 2, 3, 4
+    if ([2, 3, 4].includes(selectedPointer as number) && idsToSubmit.length > 1) {
+      if (!isWeightageValid()) {
+        setMessage({ type: 'error', text: `Total weightage must equal 100. Current total: ${getTotalWeightage().toFixed(2)}` });
+        return;
+      }
+    }
+
     setSelectingActivities(true);
     setMessage(null);
 
     try {
-      const response = await axios.post('http://localhost:5000/api/pointer/activity/select', {
+      const payload: any = {
         studentIvyServiceId,
         counselorId,
         agentSuggestionIds: idsToSubmit,
         pointerNo: selectedPointer,
-      });
+      };
+
+      // Add weightages for Pointers 2, 3, 4
+      if ([2, 3, 4].includes(selectedPointer as number) && idsToSubmit.length > 0) {
+        payload.weightages = idsToSubmit.map(id => activityWeightages[id] || 0);
+      }
+
+      const response = await axios.post('http://localhost:5000/api/pointer/activity/select', payload);
 
       if (response.data.success) {
         setMessage({ type: 'success', text: 'Activities selected successfully!' });
+        // Don't reset weightages - keep them for reference
         setTimeout(() => {
           fetchStudentActivities();
         }, 500);
@@ -423,6 +534,37 @@ function ActivitiesContent() {
                   </div>
                 ) : suggestions.length > 0 ? (
                   <div className="space-y-4">
+                    {/* Weightage Info Banner for Pointers 2, 3, 4 */}
+                    {[2, 3, 4].includes(selectedPointer as number) && currentPointerSelectionCount > 0 && (
+                      <div className={`p-4 rounded-lg border-2 ${
+                        currentPointerSelectionCount === 1 
+                          ? 'bg-green-50 border-green-300' 
+                          : isWeightageValid() 
+                            ? 'bg-green-50 border-green-300' 
+                            : 'bg-red-50 border-red-300'
+                      }`}>
+                        <h4 className="font-bold text-sm mb-2 text-gray-900">
+                          {currentPointerSelectionCount === 1 ? '✓ Single Activity Selected' : '⚠️ Multiple Activities - Weightage Required'}
+                        </h4>
+                        {currentPointerSelectionCount === 1 ? (
+                          <p className="text-sm text-green-900 font-medium">
+                            This activity will automatically receive 100% weightage.
+                          </p>
+                        ) : (
+                          <div className="space-y-1">
+                            <p className="text-sm font-semibold text-gray-900">
+                              Total Weightage: <span className={`text-lg font-bold ${isWeightageValid() ? 'text-green-800' : 'text-red-800'}`}>
+                                {getTotalWeightage().toFixed(1)}/100
+                              </span>
+                            </p>
+                            <p className="text-sm text-gray-800 font-medium">
+                              Assign weightage to each activity below. The total must equal exactly 100%.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
                     <div className="flex items-center justify-between">
                       <h2 className="text-lg font-semibold text-gray-900">
                         {getPointerLabel(selectedPointer as number)} - Suitable Activities
@@ -430,6 +572,11 @@ function ActivitiesContent() {
                       <span className="text-sm text-gray-500">
                         {suggestions.length} activit{suggestions.length !== 1 ? 'ies' : 'y'}
                         {currentPointerSelectionCount > 0 && ` • ${currentPointerSelectionCount} selected`}
+                        {[2, 3, 4].includes(selectedPointer as number) && currentPointerSelectionCount > 1 && (
+                          <span className={`ml-2 font-semibold ${isWeightageValid() ? 'text-green-600' : 'text-red-600'}`}>
+                            • Total: {getTotalWeightage().toFixed(1)}/100
+                          </span>
+                        )}
                       </span>
                     </div>
 
@@ -474,6 +621,37 @@ function ActivitiesContent() {
                                   </div>
                                 )}
                               </label>
+                              
+                              {/* Weightage input for Pointers 2, 3, 4 - Multiple Activities */}
+                              {[2, 3, 4].includes(selectedPointer as number) && selectedActivities.has(suggestion._id) && currentPointerSelectionCount > 1 && (
+                                <div className="mt-3 p-4 bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-400 rounded-lg shadow-sm">
+                                  <div className="flex items-center gap-3">
+                                    <label className="text-sm font-bold text-orange-900">Weightage:</label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      step="0.1"
+                                      value={activityWeightages[suggestion._id] || 0}
+                                      onChange={(e) => handleWeightageChange(suggestion._id, e.target.value)}
+                                      className="w-28 px-4 py-2.5 border-2 border-orange-500 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-orange-600 text-base font-bold text-orange-900 bg-white"
+                                    />
+                                    <span className="text-base font-bold text-orange-900">%</span>
+                                  </div>
+                                  <p className="text-xs text-orange-800 mt-2 font-medium">
+                                    Assign weightage for this activity (total must equal 100%)
+                                  </p>
+                                </div>
+                              )}
+                              
+                              {/* Weightage for Pointers 2, 3, 4 - Single Activity */}
+                              {[2, 3, 4].includes(selectedPointer as number) && selectedActivities.has(suggestion._id) && currentPointerSelectionCount === 1 && (
+                                <div className="mt-3">
+                                  <span className="text-sm font-semibold text-green-700 bg-green-100 px-3 py-1.5 rounded-md border border-green-300">
+                                    ✓ Weightage: 100% (Auto-assigned)
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -484,7 +662,7 @@ function ActivitiesContent() {
                     {currentPointerSelectionCount > 0 && (
                       <button
                         onClick={handleSelectActivities}
-                        disabled={selectingActivities}
+                        disabled={selectingActivities || ([2, 3, 4].includes(selectedPointer as number) && currentPointerSelectionCount > 1 && !isWeightageValid())}
                         className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         {selectingActivities ? 'Selecting...' : `Select ${currentPointerSelectionCount} Activity(ies)`}
@@ -542,6 +720,11 @@ function ActivitiesContent() {
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">{activity.title}</h3>
                         <p className="text-sm text-gray-500 mb-2">
                           {getPointerLabel(activity.pointerNo)}
+                          {[2, 3, 4].includes(activity.pointerNo) && activity.weightage !== undefined && (
+                            <span className="ml-3 font-semibold text-blue-600">
+                              • Weightage: {activity.weightage}%
+                            </span>
+                          )}
                         </p>
                         <p className="text-gray-700 whitespace-pre-wrap mb-4">
                           {activity.description}
