@@ -27,9 +27,11 @@
     "docx-pdf": "^0.0.1",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "mammoth": "^1.11.0",
     "mongoose": "^9.1.1",
     "multer": "^2.0.2",
     "officegen": "^0.6.5",
+    "pdf-parse": "^2.4.5",
     "xlsx": "^0.18.5"
   }
 }

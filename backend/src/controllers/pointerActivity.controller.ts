@@ -6,6 +6,7 @@ import {
   uploadProof,
   evaluateActivity,
   uploadCounselorDocuments,
+  updateDocumentTaskStatus,
 } from '../services/pointerActivity.service';
 
 const storage = multer.memoryStorage();
@@ -233,4 +234,53 @@ export const uploadCounselorDocumentsHandler = async (req: Request, res: Respons
   }
 };
 
+export const updateDocumentTaskStatusHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { selectionId, documentUrl, taskIndex, status } = req.body;
+    const counselorId = req.body.counselorId || req.headers['user-id'];
+
+    if (!selectionId) {
+      res.status(400).json({ success: false, message: 'selectionId is required' });
+      return;
+    }
+    if (!counselorId) {
+      res.status(400).json({ success: false, message: 'counselorId is required' });
+      return;
+    }
+    if (!documentUrl) {
+      res.status(400).json({ success: false, message: 'documentUrl is required' });
+      return;
+    }
+    if (typeof taskIndex !== 'number') {
+      res.status(400).json({ success: false, message: 'taskIndex is required' });
+      return;
+    }
+    if (!status || !['not-started', 'in-progress', 'completed'].includes(status)) {
+      res.status(400).json({ success: false, message: 'status must be one of: not-started, in-progress, completed' });
+      return;
+    }
+
+    const selection = await updateDocumentTaskStatus(
+      selectionId,
+      counselorId as string,
+      documentUrl,
+      taskIndex,
+      status
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Task status updated successfully',
+      data: {
+        selectionId: selection._id,
+        counselorDocuments: selection.counselorDocuments,
+      },
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to update task status',
+    });
+  }
+};
 

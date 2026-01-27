@@ -7,6 +7,7 @@ import {
   selectActivitiesHandler,
   uploadProofHandler,
   uploadCounselorDocumentsHandler,
+  updateDocumentTaskStatusHandler,
 } from '../controllers/pointerActivity.controller';
 
 const router = Router();
@@ -23,6 +24,9 @@ router.post('/proof/upload', proofUploadMiddleware, uploadProofHandler);
 
 // Counselor uploads documents for activities
 router.post('/counselor/documents', counselorDocsMiddleware, uploadCounselorDocumentsHandler);
+
+// Counselor updates task completion status
+router.post('/counselor/task/status', updateDocumentTaskStatusHandler);
 
 // Counselor evaluates submission
 router.post('/evaluate', evaluateActivityHandler);

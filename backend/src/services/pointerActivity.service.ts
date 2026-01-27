@@ -10,6 +10,7 @@ import User from '../models/ivy/User';
 import { PointerNo } from '../types/PointerNo';
 import { USER_ROLE } from '../types/roles';
 import { updateScoreAfterEvaluation } from './ivyScore.service';
+import { extractTOC } from './tocExtractor.service';
 
 const SUPPORTED_POINTERS = [
   PointerNo.SpikeInOneArea,
@@ -495,14 +496,74 @@ export const uploadCounselorDocuments = async (
     }
   }
 
-  // Save new documents
-  const fileUrls = await saveCounselorDocuments(files, selection.pointerNo, selection._id.toString());
+  // Save files first
+  const savedFileUrls = await saveCounselorDocuments(files, selection.pointerNo, selection._id.toString());
+
+  // Extract TOC and create document entries
+  const documentEntries = await Promise.all(
+    savedFileUrls.map(async (fileUrl) => {
+      const fullPath = path.join(process.cwd(), fileUrl);
+      
+      // Extract table of contents from the document
+      const extractedTasks = await extractTOC(fullPath);
+      
+      return {
+        url: fileUrl,
+        tasks: extractedTasks.map(task => ({
+          title: task.title,
+          page: task.page,
+          status: 'not-started' as const
+        }))
+      };
+    })
+  );
 
   // Add to existing documents
-  selection.counselorDocuments = [...(selection.counselorDocuments || []), ...fileUrls];
+  selection.counselorDocuments = [...(selection.counselorDocuments || []), ...documentEntries];
   await selection.save();
 
   return selection;
 };
 
+export const updateDocumentTaskStatus = async (
+  selectionId: string,
+  counselorId: string,
+  documentUrl: string,
+  taskIndex: number,
+  status: 'not-started' | 'in-progress' | 'completed'
+) => {
+  const selection = await CounselorSelectedSuggestion.findById(ensureObjectId(selectionId, 'selectionId'));
+  if (!selection) {
+    throw new Error('Selected activity not found');
+  }
+  ensureAllowedPointer(selection.pointerNo);
 
+  const service = await StudentIvyService.findById(selection.studentIvyServiceId);
+  if (!service) {
+    throw new Error('Student Ivy Service not found');
+  }
+
+  if (service.counselorId.toString() !== counselorId) {
+    throw new Error('Unauthorized: counselor does not match this service');
+  }
+
+  const counselor = await User.findById(counselorId);
+  if (!counselor || counselor.role !== USER_ROLE.COUNSELOR) {
+    throw new Error('Unauthorized: user is not a counselor');
+  }
+
+  // Find the document and update task status
+  const document = selection.counselorDocuments?.find(doc => doc.url === documentUrl);
+  if (!document) {
+    throw new Error('Document not found');
+  }
+
+  if (taskIndex < 0 || taskIndex >= document.tasks.length) {
+    throw new Error('Invalid task index');
+  }
+
+  document.tasks[taskIndex].status = status;
+  await selection.save();
+
+  return selection;
+};

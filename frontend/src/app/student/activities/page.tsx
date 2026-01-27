@@ -103,6 +103,17 @@ function WordDocViewer({ url }: { url: string }) {
   );
 }
 
+interface DocumentTask {
+  title: string;
+  page?: number;
+  status: 'not-started' | 'in-progress' | 'completed';
+}
+
+interface CounselorDocument {
+  url: string;
+  tasks: DocumentTask[];
+}
+
 interface StudentActivity {
   selectionId: string;
   suggestion?: { _id: string; title: string; description: string; tags: string[] };
@@ -112,7 +123,7 @@ interface StudentActivity {
   tags: string[];
   selectedAt: string;
   weightage?: number; // Weightage for Pointers 2, 3, 4
-  counselorDocuments?: string[]; // Documents uploaded by counselor
+  counselorDocuments?: CounselorDocument[]; // Documents with tasks
   proofUploaded: boolean;
   submission: {
     _id: string;
@@ -358,38 +369,100 @@ function ActivitiesContent() {
                   )}
                 </div>
 
-                {/* Counselor Documents - View Only */}
+                {/* Counselor Documents with Tasks - View Only */}
                 {activity.counselorDocuments && activity.counselorDocuments.length > 0 && (
                   <div className="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-md">
-                    <p className="text-sm font-medium text-indigo-900 mb-3">📄 Documents from Counselor</p>
-                    <div className="space-y-3">
-                      {activity.counselorDocuments.map((docUrl, idx) => {
-                        const isPdf = docUrl.toLowerCase().endsWith('.pdf');
-                        const isWord = docUrl.toLowerCase().endsWith('.doc') || docUrl.toLowerCase().endsWith('.docx');
-                        const isViewing = viewingCounselorDocUrl === docUrl;
+                    <p className="text-sm font-medium text-indigo-900 mb-3">📄 Documents & Tasks from Counselor</p>
+                    <div className="space-y-4">
+                      {activity.counselorDocuments.map((doc, docIdx) => {
+                        const isPdf = doc.url.toLowerCase().endsWith('.pdf');
+                        const isWord = doc.url.toLowerCase().endsWith('.doc') || doc.url.toLowerCase().endsWith('.docx');
+                        const isViewing = viewingCounselorDocUrl === doc.url;
                         
                         return (
-                          <div key={idx} className="flex flex-col">
-                            <div className="flex items-center justify-between p-3 bg-white rounded border border-indigo-100">
-                              <span className="text-sm text-gray-700 font-medium">Document {idx + 1}</span>
+                          <div key={docIdx} className="bg-white rounded-lg border border-indigo-200 overflow-hidden">
+                            {/* Document Header */}
+                            <div className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50 to-white border-b border-indigo-100">
+                              <span className="text-sm text-gray-800 font-semibold">📎 Document {docIdx + 1}</span>
                               <button
-                                onClick={() => setViewingCounselorDocUrl(isViewing ? null : docUrl)}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${isViewing ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}`}
+                                onClick={() => setViewingCounselorDocUrl(isViewing ? null : doc.url)}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${isViewing ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}`}
                               >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                 </svg>
-                                {isViewing ? 'Hide Document' : 'View Document'}
+                                {isViewing ? 'Hide' : 'View'}
                               </button>
                             </div>
+
+                            {/* Tasks List */}
+                            <div className="p-3">
+                              <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Tasks</p>
+                              <div className="space-y-1.5">
+                                {[...doc.tasks].sort((a, b) => {
+                                  // Sort: not-started and in-progress first, completed last
+                                  if (a.status === 'completed' && b.status !== 'completed') return 1;
+                                  if (a.status !== 'completed' && b.status === 'completed') return -1;
+                                  return 0;
+                                }).map((task, taskIdx) => {
+                                  const getStatusBadge = (status: string) => {
+                                    switch (status) {
+                                      case 'completed':
+                                        return { bg: 'bg-green-100', text: 'text-green-800', label: 'Completed', icon: '✓' };
+                                      case 'in-progress':
+                                        return { bg: 'bg-blue-100', text: 'text-blue-800', label: 'In Progress', icon: '⟳' };
+                                      default:
+                                        return { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Not Started', icon: '○' };
+                                    }
+                                  };
+                                  const statusBadge = getStatusBadge(task.status);
+                                  
+                                  return (
+                                    <div
+                                      key={taskIdx}
+                                      className="flex items-start gap-2 p-2 rounded bg-gray-50 hover:bg-gray-100 transition-colors"
+                                    >
+                                      {task.status === 'completed' && (
+                                        <div className="flex-shrink-0 mt-0.5">
+                                          <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                          </svg>
+                                        </div>
+                                      )}
+                                      <div className="flex-1 min-w-0">
+                                        <p className={`text-sm ${task.status === 'completed' ? 'text-gray-500 line-through' : 'text-gray-700 font-medium'}`}>
+                                          {task.title}
+                                        </p>
+                                        {task.page && (
+                                          <p className="text-xs text-gray-500 mt-0.5">Page {task.page}</p>
+                                        )}
+                                      </div>
+                                      <span className={`flex-shrink-0 px-2.5 py-1 text-xs font-medium ${statusBadge.bg} ${statusBadge.text} rounded-full flex items-center gap-1`}>
+                                        <span>{statusBadge.icon}</span>
+                                        {statusBadge.label}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              <div className="mt-3 pt-2 border-t border-gray-200">
+                                <p className="text-xs text-gray-600">
+                                  <span className="font-medium text-indigo-700">
+                                    {doc.tasks.filter(t => t.status === 'completed').length} of {doc.tasks.length}
+                                  </span> tasks completed by counselor
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Document Viewer */}
                             {isViewing && (
-                              <div className="mt-2 p-3 bg-white rounded border border-indigo-100">
+                              <div className="border-t border-indigo-100 p-3 bg-gray-50">
                                 {isPdf ? (
                                   <iframe
-                                    src={`http://localhost:5000${docUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                                    src={`http://localhost:5000${doc.url}#toolbar=0&navpanes=0&scrollbar=0`}
                                     className="w-full h-96 border-none rounded"
-                                    title={`Counselor Document ${idx + 1}`}
+                                    title={`Counselor Document ${docIdx + 1}`}
                                     onContextMenu={(e) => e.preventDefault()}
                                     style={{ pointerEvents: 'none', userSelect: 'none' }}
                                     onLoad={(e) => {
@@ -406,7 +479,7 @@ function ActivitiesContent() {
                                     }}
                                   />
                                 ) : isWord ? (
-                                  <WordDocViewer url={docUrl} />
+                                  <WordDocViewer url={doc.url} />
                                 ) : (
                                   <div className="w-full h-64 flex items-center justify-center bg-gray-100 rounded">
                                     <p className="text-gray-600">Document preview not available</p>

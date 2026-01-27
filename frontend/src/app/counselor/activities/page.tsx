@@ -88,6 +88,17 @@ function InlineDocViewer({ url, onClose }: { url: string, onClose: () => void })
   );
 }
 
+interface DocumentTask {
+  title: string;
+  page?: number;
+  status: 'not-started' | 'in-progress' | 'completed';
+}
+
+interface CounselorDocument {
+  url: string;
+  tasks: DocumentTask[];
+}
+
 interface AgentSuggestion {
   _id: string;
   title: string;
@@ -105,7 +116,7 @@ interface StudentActivity {
   tags: string[];
   selectedAt: string;
   weightage?: number; // Weightage for Pointers 2, 3, 4
-  counselorDocuments?: string[]; // Documents uploaded by counselor
+  counselorDocuments?: CounselorDocument[]; // Documents with tasks
   proofUploaded: boolean;
   submission: {
     _id: string;
@@ -833,20 +844,120 @@ function ActivitiesContent() {
                           </button>
                         </div>
                         {activity.counselorDocuments && activity.counselorDocuments.length > 0 ? (
-                          <div className="space-y-2">
-                            {activity.counselorDocuments.map((docUrl, idx) => (
-                              <div key={idx} className="flex flex-col">
-                                <div className="flex items-center justify-between p-2 bg-white rounded border border-purple-100">
-                                  <span className="text-sm text-gray-700 truncate flex-1">Document {idx + 1}</span>
+                          <div className="space-y-3">
+                            {activity.counselorDocuments.map((doc, docIdx) => (
+                              <div key={docIdx} className="bg-white rounded-lg border border-purple-200 overflow-hidden">
+                                {/* Document Header */}
+                                <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-white border-b border-purple-100">
+                                  <span className="text-sm text-gray-800 font-semibold">📎 Document {docIdx + 1}</span>
                                   <button
-                                    onClick={() => setViewingCounselorDocUrl(viewingCounselorDocUrl === docUrl ? null : docUrl)}
-                                    className={`text-sm font-medium px-3 py-1 rounded ${viewingCounselorDocUrl === docUrl ? 'bg-purple-600 text-white' : 'text-purple-600 hover:text-purple-800 hover:bg-purple-50'}`}
+                                    onClick={() => setViewingCounselorDocUrl(viewingCounselorDocUrl === doc.url ? null : doc.url)}
+                                    className={`text-xs font-medium px-3 py-1.5 rounded-md ${viewingCounselorDocUrl === doc.url ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}`}
                                   >
-                                    {viewingCounselorDocUrl === docUrl ? 'Hide' : 'View'}
+                                    {viewingCounselorDocUrl === doc.url ? 'Hide' : 'View'}
                                   </button>
                                 </div>
-                                {viewingCounselorDocUrl === docUrl && (
-                                  <InlineDocViewer url={docUrl} onClose={() => setViewingCounselorDocUrl(null)} />
+
+                                {/* Tasks List with Status Dropdown */}
+                                <div className="p-3">
+                                  <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Tasks</p>
+                                  <div className="space-y-1.5">
+                                    {[...doc.tasks].sort((a, b) => {
+                                      // Sort: not-started and in-progress first, completed last
+                                      if (a.status === 'completed' && b.status !== 'completed') return 1;
+                                      if (a.status !== 'completed' && b.status === 'completed') return -1;
+                                      return 0;
+                                    }).map((task, taskIdx) => {
+                                      // Find original index for API call
+                                      const originalIndex = doc.tasks.findIndex(t => t.title === task.title && t.page === task.page);
+                                      
+                                      return (
+                                        <div
+                                          key={taskIdx}
+                                          className="flex items-start gap-2 p-2 rounded bg-gray-50 hover:bg-gray-100 transition-colors"
+                                        >
+                                          {task.status === 'completed' && (
+                                            <div className="flex-shrink-0 mt-0.5">
+                                              <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                              </svg>
+                                            </div>
+                                          )}
+                                          <div className="flex-1 min-w-0">
+                                            <p className={`text-sm font-medium mb-1 ${task.status === 'completed' ? 'text-gray-500 line-through' : 'text-gray-700'}`}>
+                                              {task.title}
+                                            </p>
+                                            {task.page && (
+                                              <p className="text-xs text-gray-500">Page {task.page}</p>
+                                            )}
+                                          </div>
+                                          <select
+                                            value={task.status}
+                                            onChange={async (e) => {
+                                              const newStatus = e.target.value as 'not-started' | 'in-progress' | 'completed';
+                                              try {
+                                                const response = await axios.post('http://localhost:5000/api/pointer/activity/counselor/task/status', {
+                                                  selectionId: activity.selectionId,
+                                                  counselorId,
+                                                  documentUrl: doc.url,
+                                                  taskIndex: originalIndex,
+                                                  status: newStatus
+                                                });
+                                                
+                                                if (response.data.success) {
+                                                  // Update local state
+                                                  setStudentActivities(prev => prev.map(act => {
+                                                    if (act.selectionId === activity.selectionId) {
+                                                      const updatedDocs = act.counselorDocuments?.map((d, idx) => {
+                                                        if (idx === docIdx) {
+                                                          const updatedTasks = d.tasks.map((t, tIdx) => 
+                                                            tIdx === originalIndex ? { ...t, status: newStatus } : t
+                                                          );
+                                                          return { ...d, tasks: updatedTasks };
+                                                        }
+                                                        return d;
+                                                      });
+                                                      return { ...act, counselorDocuments: updatedDocs };
+                                                    }
+                                                    return act;
+                                                  }));
+                                                  setMessage({ type: 'success', text: 'Task status updated' });
+                                                  setTimeout(() => setMessage(null), 2000);
+                                                }
+                                              } catch (error: any) {
+                                                setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to update task' });
+                                              }
+                                            }}
+                                            className={`text-xs font-medium px-3 py-1.5 rounded-md border-2 cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                                              task.status === 'completed' 
+                                                ? 'bg-green-100 text-green-800 border-green-300' 
+                                                : task.status === 'in-progress'
+                                                ? 'bg-blue-100 text-blue-800 border-blue-300'
+                                                : 'bg-gray-100 text-gray-600 border-gray-300'
+                                            }`}
+                                          >
+                                            <option value="not-started">Not Started</option>
+                                            <option value="in-progress">In Progress</option>
+                                            <option value="completed">Completed</option>
+                                          </select>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  <div className="mt-3 pt-2 border-t border-gray-200">
+                                    <p className="text-xs text-gray-600">
+                                      <span className="font-medium text-purple-700">
+                                        {doc.tasks.filter(t => t.status === 'completed').length} of {doc.tasks.length}
+                                      </span> tasks completed
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Document Viewer */}
+                                {viewingCounselorDocUrl === doc.url && (
+                                  <div className="border-t border-purple-100">
+                                    <InlineDocViewer url={doc.url} onClose={() => setViewingCounselorDocUrl(null)} />
+                                  </div>
                                 )}
                               </div>
                             ))}
