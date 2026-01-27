@@ -65,6 +65,25 @@ const deleteFilesIfExist = (filePaths: string[]) => {
   });
 };
 
+const saveCounselorDocuments = async (
+  files: Express.Multer.File[],
+  pointerNo: PointerNo,
+  selectionId: string,
+): Promise<string[]> => {
+  const folderPath = path.join(UPLOAD_DIR, 'counselor-docs', pointerNo.toString(), selectionId);
+  if (!fs.existsSync(folderPath)) {
+    fs.mkdirSync(folderPath, { recursive: true });
+  }
+
+  return files.map((file) => {
+    const safeName = cleanFileName(file.originalname);
+    const fileName = `${Date.now()}-${safeName}`;
+    const filePath = path.join(folderPath, fileName);
+    fs.writeFileSync(filePath, file.buffer);
+    return `/uploads/pointer-activities/counselor-docs/${pointerNo}/${selectionId}/${fileName}`;
+  });
+};
+
 export const selectActivities = async (
   studentIvyServiceId: string,
   counselorId: string,
@@ -397,6 +416,7 @@ export const getStudentActivities = async (
       suggestion: suggestionMap.get(sel.agentSuggestionId.toString()),
       selectedAt: sel.selectedAt,
       weightage: sel.weightage, // Include weightage for Pointer 2
+      counselorDocuments: sel.counselorDocuments || [], // Include counselor uploaded documents
       proofUploaded: !!submission,
       evaluated: !!evaluation,
       submission: submission
@@ -432,6 +452,57 @@ export const getStudentActivities = async (
     counselorId: service.counselorId,
     activities,
   };
+};
+
+export const uploadCounselorDocuments = async (
+  selectionId: string,
+  counselorId: string,
+  files: Express.Multer.File[],
+) => {
+  if (!files || files.length === 0) {
+    throw new Error('At least one document file is required');
+  }
+
+  const selection = await CounselorSelectedSuggestion.findById(ensureObjectId(selectionId, 'selectionId'));
+  if (!selection) {
+    throw new Error('Selected activity not found');
+  }
+  ensureAllowedPointer(selection.pointerNo);
+
+  const service = await StudentIvyService.findById(selection.studentIvyServiceId);
+  if (!service) {
+    throw new Error('Student Ivy Service not found');
+  }
+
+  if (service.counselorId.toString() !== counselorId) {
+    throw new Error('Unauthorized: counselor does not match this service');
+  }
+
+  const counselor = await User.findById(counselorId);
+  if (!counselor || counselor.role !== USER_ROLE.COUNSELOR) {
+    throw new Error('Unauthorized: user is not a counselor');
+  }
+
+  // Validate file types (PDF and Word documents)
+  const allowedMimeTypes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ];
+  for (const file of files) {
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new Error(`Invalid file type: ${file.originalname}. Only PDF and Word documents are allowed.`);
+    }
+  }
+
+  // Save new documents
+  const fileUrls = await saveCounselorDocuments(files, selection.pointerNo, selection._id.toString());
+
+  // Add to existing documents
+  selection.counselorDocuments = [...(selection.counselorDocuments || []), ...fileUrls];
+  await selection.save();
+
+  return selection;
 };
 
 

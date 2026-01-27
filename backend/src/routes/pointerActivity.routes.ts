@@ -3,8 +3,10 @@ import {
   evaluateActivityHandler,
   getStudentActivitiesHandler,
   proofUploadMiddleware,
+  counselorDocsMiddleware,
   selectActivitiesHandler,
   uploadProofHandler,
+  uploadCounselorDocumentsHandler,
 } from '../controllers/pointerActivity.controller';
 
 const router = Router();
@@ -18,6 +20,9 @@ router.get('/student', getStudentActivitiesHandler);
 
 // Student uploads proof files
 router.post('/proof/upload', proofUploadMiddleware, uploadProofHandler);
+
+// Counselor uploads documents for activities
+router.post('/counselor/documents', counselorDocsMiddleware, uploadCounselorDocumentsHandler);
 
 // Counselor evaluates submission
 router.post('/evaluate', evaluateActivityHandler);

@@ -3,10 +3,35 @@
 import { useState, useEffect, Suspense } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'next/navigation';
+import mammoth from 'mammoth';
 
 function InlineDocViewer({ url, onClose }: { url: string, onClose: () => void }) {
   const fullUrl = `http://localhost:5000${url}`;
   const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+  const isWord = /\.(doc|docx)$/i.test(url);
+  const [wordContent, setWordContent] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string>('');
+
+  useEffect(() => {
+    if (isWord) {
+      setIsLoading(true);
+      setError('');
+      axios.get(fullUrl, { responseType: 'arraybuffer' })
+        .then(response => {
+          return mammoth.convertToHtml({ arrayBuffer: response.data });
+        })
+        .then(result => {
+          setWordContent(result.value);
+          setIsLoading(false);
+        })
+        .catch(err => {
+          console.error('Error loading Word document:', err);
+          setError('Failed to load document');
+          setIsLoading(false);
+        });
+    }
+  }, [fullUrl, isWord]);
 
   return (
     <div className="mt-4 relative bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border-4 border-gray-800 animate-in fade-in zoom-in-95 duration-300">
@@ -23,6 +48,38 @@ function InlineDocViewer({ url, onClose }: { url: string, onClose: () => void })
       <div className="min-h-[500px] flex items-center justify-center bg-gray-800">
         {isImage ? (
           <img src={fullUrl} alt="Document" className="max-w-full max-h-[800px] object-contain" />
+        ) : isWord ? (
+          <div className="w-full h-[600px] overflow-auto bg-white p-6">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
+              </div>
+            ) : error ? (
+              <div className="flex items-center justify-center h-full text-red-500">{error}</div>
+            ) : (
+              <>
+                <style jsx global>{`
+                  .counselor-word-content p, .counselor-word-content h1, .counselor-word-content h2, .counselor-word-content h3, 
+                  .counselor-word-content h4, .counselor-word-content h5, .counselor-word-content h6, .counselor-word-content li,
+                  .counselor-word-content span, .counselor-word-content div, .counselor-word-content td, .counselor-word-content th {
+                    color: #1f2937 !important;
+                  }
+                  .counselor-word-content h1, .counselor-word-content h2, .counselor-word-content h3 {
+                    font-weight: 700 !important;
+                    margin-bottom: 0.5rem !important;
+                  }
+                  .counselor-word-content p {
+                    margin-bottom: 0.75rem !important;
+                    line-height: 1.6 !important;
+                  }
+                `}</style>
+                <div 
+                  className="counselor-word-content text-gray-800"
+                  dangerouslySetInnerHTML={{ __html: wordContent }}
+                />
+              </>
+            )}
+          </div>
         ) : (
           <iframe src={fullUrl} className="w-full h-[600px] border-none" title="Document Viewer" />
         )}
@@ -48,6 +105,7 @@ interface StudentActivity {
   tags: string[];
   selectedAt: string;
   weightage?: number; // Weightage for Pointers 2, 3, 4
+  counselorDocuments?: string[]; // Documents uploaded by counselor
   proofUploaded: boolean;
   submission: {
     _id: string;
@@ -91,6 +149,7 @@ function ActivitiesContent() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'suggestions' | 'evaluate'>('suggestions');
   const [viewingFileUrl, setViewingFileUrl] = useState<string | null>(null);
+  const [viewingCounselorDocUrl, setViewingCounselorDocUrl] = useState<string | null>(null);
 
   const fetchStudentActivities = async () => {
     const studentId = searchParams.get('studentId');
@@ -729,6 +788,72 @@ function ActivitiesContent() {
                         <p className="text-gray-700 whitespace-pre-wrap mb-4">
                           {activity.description}
                         </p>
+                      </div>
+
+                      {/* Counselor Documents Upload Section */}
+                      <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-md">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-sm font-medium text-purple-900">Documents for Student</p>
+                          <input
+                            type="file"
+                            id={`doc-upload-${activity.selectionId}`}
+                            multiple
+                            accept=".pdf,.doc,.docx"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const files = e.target.files;
+                              if (!files || files.length === 0) return;
+
+                              try {
+                                const formData = new FormData();
+                                Array.from(files).forEach(file => formData.append('counselorDocs', file));
+                                formData.append('selectionId', activity.selectionId);
+                                formData.append('counselorId', counselorId);
+
+                                const response = await axios.post(
+                                  'http://localhost:5000/api/pointer/activity/counselor/documents',
+                                  formData,
+                                  { headers: { 'Content-Type': 'multipart/form-data' } }
+                                );
+
+                                if (response.data.success) {
+                                  setMessage({ type: 'success', text: 'Documents uploaded successfully!' });
+                                  setTimeout(() => fetchStudentActivities(), 500);
+                                }
+                              } catch (error: any) {
+                                setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to upload documents' });
+                              }
+                            }}
+                          />
+                          <button
+                            onClick={() => document.getElementById(`doc-upload-${activity.selectionId}`)?.click()}
+                            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm font-medium"
+                          >
+                            + Upload Document
+                          </button>
+                        </div>
+                        {activity.counselorDocuments && activity.counselorDocuments.length > 0 ? (
+                          <div className="space-y-2">
+                            {activity.counselorDocuments.map((docUrl, idx) => (
+                              <div key={idx} className="flex flex-col">
+                                <div className="flex items-center justify-between p-2 bg-white rounded border border-purple-100">
+                                  <span className="text-sm text-gray-700 truncate flex-1">Document {idx + 1}</span>
+                                  <button
+                                    onClick={() => setViewingCounselorDocUrl(viewingCounselorDocUrl === docUrl ? null : docUrl)}
+                                    className={`text-sm font-medium px-3 py-1 rounded ${viewingCounselorDocUrl === docUrl ? 'bg-purple-600 text-white' : 'text-purple-600 hover:text-purple-800 hover:bg-purple-50'}`}
+                                  >
+                                    {viewingCounselorDocUrl === docUrl ? 'Hide' : 'View'}
+                                  </button>
+                                </div>
+                                {viewingCounselorDocUrl === docUrl && (
+                                  <InlineDocViewer url={docUrl} onClose={() => setViewingCounselorDocUrl(null)} />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-purple-700">No documents uploaded yet. Upload PDF or Word documents for students to view.</p>
+                        )}
                       </div>
 
                       {activity.proofUploaded ? (

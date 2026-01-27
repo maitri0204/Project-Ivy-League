@@ -5,6 +5,7 @@ import {
   getStudentActivities,
   uploadProof,
   evaluateActivity,
+  uploadCounselorDocuments,
 } from '../services/pointerActivity.service';
 
 const storage = multer.memoryStorage();
@@ -16,6 +17,7 @@ const upload = multer({
 });
 
 export const proofUploadMiddleware = upload.array('proofFiles', 5);
+export const counselorDocsMiddleware = upload.array('counselorDocs', 5);
 
 export const selectActivitiesHandler = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -189,6 +191,44 @@ export const evaluateActivityHandler = async (req: Request, res: Response): Prom
     res.status(400).json({
       success: false,
       message: error.message || 'Failed to evaluate activity',
+    });
+  }
+};
+
+export const uploadCounselorDocumentsHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      res.status(400).json({ success: false, message: 'No files uploaded' });
+      return;
+    }
+
+    const { selectionId } = req.body;
+    const counselorId = req.body.counselorId || req.headers['user-id'];
+
+    if (!selectionId) {
+      res.status(400).json({ success: false, message: 'selectionId is required' });
+      return;
+    }
+    if (!counselorId) {
+      res.status(400).json({ success: false, message: 'counselorId is required' });
+      return;
+    }
+
+    const selection = await uploadCounselorDocuments(selectionId, counselorId as string, files);
+
+    res.status(200).json({
+      success: true,
+      message: 'Documents uploaded successfully',
+      data: {
+        selectionId: selection._id,
+        counselorDocuments: selection.counselorDocuments,
+      },
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to upload documents',
     });
   }
 };

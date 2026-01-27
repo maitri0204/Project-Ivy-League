@@ -7,6 +7,7 @@ export interface ICounselorSelectedSuggestion extends Document {
   pointerNo: PointerNo;
   isVisibleToStudent: boolean;
   weightage?: number; // Weightage for Pointer 2 activities (sum should be 100)
+  counselorDocuments?: string[]; // URLs of documents uploaded by counselor
   selectedAt?: Date;
 }
 
@@ -17,6 +18,7 @@ const counselorSelectedSuggestionSchema = new Schema<ICounselorSelectedSuggestio
   pointerNo: { type: Number, enum: Object.values(PointerNo).filter(v => typeof v === 'number') as number[], required: true },
   isVisibleToStudent: { type: Boolean, default: false, required: true },
   weightage: { type: Number, min: 0, max: 100 }, // Optional weightage for Pointer 2
+  counselorDocuments: { type: [String], default: [] }, // Array of document URLs
   selectedAt: { type: Date, default: Date.now },
 });
 
