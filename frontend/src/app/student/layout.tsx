@@ -8,6 +8,9 @@ function StudentSidebar() {
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
+    // Check if conversation is open (when a task is selected)
+    const isConversationOpen = searchParams.get('conversationOpen') === 'true';
+
     // Hardcoded for MVP as per current app logic
     const studentId = '695b93a44df1114a001dc239';
     const studentIvyServiceId = '695f7ae780f617ac22d4fdc1';
@@ -72,16 +75,18 @@ function StudentSidebar() {
     };
 
     return (
-        <aside className="w-72 bg-white border-r border-gray-100 flex flex-col h-screen sticky top-0 shadow-sm z-20">
-            <div className="p-8 border-b border-gray-50">
+        <aside className={`bg-white border-r border-gray-100 flex flex-col h-screen sticky top-0 shadow-sm z-20 transition-all duration-300 ${isConversationOpen ? 'w-20' : 'w-72'}`}>
+            <div className={`p-8 border-b border-gray-50 ${isConversationOpen ? 'px-4' : ''}`}>
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100">
+                    <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100 flex-shrink-0">
                         <span className="text-white font-black text-xl italic leading-none">I</span>
                     </div>
+                    {!isConversationOpen && (
                     <div>
                         <h1 className="font-black text-gray-900 tracking-tighter text-xl uppercase leading-none">Ivy League</h1>
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">Student Portal</p>
                     </div>
+                    )}
                 </div>
             </div>
 
@@ -92,7 +97,10 @@ function StudentSidebar() {
                         <Link
                             key={item.href}
                             href={item.href}
-                            className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm tracking-tight group ${active
+                            title={isConversationOpen ? item.name : undefined}
+                            className={`flex items-center gap-4 rounded-2xl transition-all font-bold text-sm tracking-tight group ${
+                                isConversationOpen ? 'px-3 py-3 justify-center' : 'px-5 py-4'
+                            } ${active
                                 ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 ring-4 ring-indigo-50 scale-[1.02]'
                                 : 'text-gray-500 hover:bg-gray-50 hover:text-indigo-600'
                                 }`}
@@ -100,12 +108,13 @@ function StudentSidebar() {
                             <span className={`${active ? 'text-white' : 'text-gray-400 group-hover:text-indigo-600 transition-colors'}`}>
                                 {item.icon}
                             </span>
-                            <span className="uppercase tracking-wide">{item.name}</span>
+                            {!isConversationOpen && <span className="uppercase tracking-wide">{item.name}</span>}
                         </Link>
                     );
                 })}
             </nav>
 
+            {!isConversationOpen && (
             <div className="p-6">
                 <div className="bg-gray-50 rounded-3xl p-6 border border-gray-100">
                     <div className="flex items-center gap-3 mb-4">
@@ -116,6 +125,7 @@ function StudentSidebar() {
                     <p className="text-[10px] font-medium text-gray-400 mt-1 uppercase tracking-wider">Candidate #239</p>
                 </div>
             </div>
+            )}
         </aside>
     );
 }

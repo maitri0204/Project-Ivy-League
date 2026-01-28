@@ -8,6 +8,7 @@ import {
   uploadCounselorDocuments,
   updateDocumentTaskStatus,
 } from '../services/pointerActivity.service';
+import { updateWeightages } from '../services/pointer234Activity.service';
 
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -280,6 +281,53 @@ export const updateDocumentTaskStatusHandler = async (req: Request, res: Respons
     res.status(400).json({
       success: false,
       message: error.message || 'Failed to update task status',
+    });
+  }
+};
+
+export const updateWeightagesHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { studentIvyServiceId, weightages, pointerNo } = req.body;
+    const counselorId = req.body.counselorId || req.headers['user-id'];
+
+    if (!studentIvyServiceId) {
+      res.status(400).json({
+        success: false,
+        message: 'studentIvyServiceId is required',
+      });
+      return;
+    }
+
+    if (!weightages || typeof weightages !== 'object') {
+      res.status(400).json({
+        success: false,
+        message: 'weightages object is required',
+      });
+      return;
+    }
+
+    if (!counselorId) {
+      res.status(400).json({
+        success: false,
+        message: 'counselorId is required',
+      });
+      return;
+    }
+
+    const updated = await updateWeightages(studentIvyServiceId, counselorId as string, weightages, pointerNo);
+
+    res.status(200).json({
+      success: true,
+      message: 'Weightages updated successfully',
+      data: {
+        count: updated.length,
+      },
+    });
+  } catch (error: any) {
+    console.error('Update weightages error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to update weightages',
     });
   }
 };

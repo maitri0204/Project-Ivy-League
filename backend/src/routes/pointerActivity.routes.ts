@@ -8,6 +8,7 @@ import {
   uploadProofHandler,
   uploadCounselorDocumentsHandler,
   updateDocumentTaskStatusHandler,
+  updateWeightagesHandler,
 } from '../controllers/pointerActivity.controller';
 
 const router = Router();
@@ -27,6 +28,9 @@ router.post('/counselor/documents', counselorDocsMiddleware, uploadCounselorDocu
 
 // Counselor updates task completion status
 router.post('/counselor/task/status', updateDocumentTaskStatusHandler);
+
+// Counselor updates weightages for activities
+router.put('/weightages', updateWeightagesHandler);
 
 // Counselor evaluates submission
 router.post('/evaluate', evaluateActivityHandler);

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useRef } from 'react';
 import axios from 'axios';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import mammoth from 'mammoth';
 
 function InlineDocViewer({ url, onClose }: { url: string, onClose: () => void }) {
@@ -99,6 +99,511 @@ interface CounselorDocument {
   tasks: DocumentTask[];
 }
 
+// Conversation Window Component for Counselor
+function ConversationWindow({ 
+  activityTitle, 
+  task, 
+  activityId,
+  studentIvyServiceId,
+  onClose 
+}: { 
+  activityTitle: string; 
+  task: DocumentTask; 
+  activityId: string;
+  studentIvyServiceId: string;
+  onClose: () => void;
+}) {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [messageType, setMessageType] = useState<'feedback' | 'action' | 'resource' | 'normal'>('normal');
+  const [loading, setLoading] = useState(true);
+  const [previewFile, setPreviewFile] = useState<{ url: string; name: string; type: string } | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const getFileType = (filename: string): string => {
+    const ext = filename.toLowerCase().split('.').pop();
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext || '')) return 'image';
+    if (['mp4', 'webm', 'ogg', 'mov'].includes(ext || '')) return 'video';
+    if (['pdf'].includes(ext || '')) return 'pdf';
+    return 'document';
+  };
+
+  const handleFileClick = (url: string, name: string) => {
+    const fileType = getFileType(name);
+    const fullUrl = `http://localhost:5000${url}`;
+    console.log('Opening file preview:', { url, fullUrl, name, type: fileType });
+    setPreviewFile({ url: fullUrl, name, type: fileType });
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Fetch conversation messages from API
+  useEffect(() => {
+    const fetchConversation = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get('http://localhost:5000/api/task/conversation', {
+          params: {
+            selectionId: activityId,
+            taskTitle: task.title,
+            taskPage: task.page,
+          },
+        });
+        if (response.data.success) {
+          setMessages(response.data.data.messages || []);
+        }
+      } catch (error) {
+        console.error('Error fetching conversation:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchConversation();
+  }, [activityId, task.title, task.page]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() && !attachedFile) return;
+
+    try {
+      const formData = new FormData();
+      formData.append('studentIvyServiceId', studentIvyServiceId);
+      formData.append('selectionId', activityId);
+      formData.append('taskTitle', task.title);
+      formData.append('taskPage', String(task.page));
+      formData.append('sender', 'counselor');
+      formData.append('senderName', 'Counselor');
+      formData.append('text', newMessage.trim() || ' ');
+      formData.append('messageType', messageType);
+      
+      if (attachedFile) {
+        formData.append('file', attachedFile);
+      }
+
+      const response = await axios.post('http://localhost:5000/api/task/conversation/message', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (response.data.success) {
+        setMessages(response.data.data.messages || []);
+        setNewMessage('');
+        setAttachedFile(null);
+        setMessageType('normal');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-white">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-gray-900 mb-1">{activityTitle}</h2>
+              <p className="text-sm text-gray-500">Spike in One Area</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="ml-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              <span className="font-medium text-green-600">ADMIN ACTIVE</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-gray-50">
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500">Loading conversation...</p>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500">No messages yet. Start the conversation!</p>
+            </div>
+          ) : (
+            messages.map((msg, index) => (
+              <div key={index} className={`flex ${msg.sender === 'counselor' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[75%] ${msg.sender === 'counselor' ? 'order-2' : 'order-1'}`}>
+                  {msg.messageType === 'feedback' && msg.sender === 'counselor' ? (
+                    // Feedback message from counselor
+                    <div className="bg-blue-500 text-white rounded-2xl px-4 py-3 mb-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-xs font-semibold uppercase tracking-wide">Feedback</span>
+                      </div>
+                      {msg.text.trim() && <p className="text-sm leading-relaxed">{msg.text}</p>}
+                      {msg.attachment && (
+                        <div 
+                          onClick={() => handleFileClick(msg.attachment!.url, msg.attachment!.name)}
+                          className={`${msg.text.trim() ? 'mt-3' : ''} p-3 bg-blue-400/30 rounded-lg flex items-center gap-3 cursor-pointer hover:bg-blue-400/40 transition-colors`}
+                        >
+                          <div className="p-2 bg-blue-400 rounded">
+                            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-white truncate">{msg.attachment.name}</p>
+                            <p className="text-xs text-blue-100">{msg.attachment.size}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : msg.messageType === 'feedback' && msg.sender === 'student' ? (
+                    // Advice message from student
+                    <div className="bg-white border-2 border-green-200 rounded-2xl px-4 py-3 mb-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-xs font-semibold text-green-600 uppercase tracking-wide">Advice</span>
+                      </div>
+                      {msg.text.trim() && <p className="text-sm text-gray-800 leading-relaxed">{msg.text}</p>}
+                      {msg.attachment && (
+                        <div 
+                          onClick={() => handleFileClick(msg.attachment!.url, msg.attachment!.name)}
+                          className={`${msg.text.trim() ? 'mt-3' : ''} p-3 bg-green-50 rounded-lg flex items-center gap-3 cursor-pointer hover:bg-green-100 transition-colors`}
+                        >
+                          <div className="p-2 bg-green-100 rounded">
+                            <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{msg.attachment.name}</p>
+                            <p className="text-xs text-gray-500">{msg.attachment.size}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : msg.messageType === 'action' && msg.sender === 'counselor' ? (
+                    // Action Suggested message from counselor
+                    <div className="bg-white border-2 border-purple-200 rounded-2xl px-4 py-3 mb-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <svg className="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-xs font-semibold text-purple-600 uppercase tracking-wide">Action Suggested</span>
+                      </div>
+                      {msg.text.trim() && <p className="text-sm text-gray-800 leading-relaxed">{msg.text}</p>}
+                      {msg.attachment && (
+                        <div 
+                          onClick={() => handleFileClick(msg.attachment!.url, msg.attachment!.name)}
+                          className={`${msg.text.trim() ? 'mt-3' : ''} p-3 bg-purple-50 rounded-lg flex items-center gap-3 cursor-pointer hover:bg-purple-100 transition-colors`}
+                        >
+                          <div className="p-2 bg-purple-100 rounded">
+                            <svg className="w-5 h-5 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{msg.attachment.name}</p>
+                            <p className="text-xs text-gray-500">{msg.attachment.size}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : msg.messageType === 'resource' && msg.sender === 'counselor' ? (
+                    // Resource message from counselor
+                    <div className="bg-white border-2 border-indigo-200 rounded-2xl px-4 py-3 mb-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <svg className="w-4 h-4 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">Resource</span>
+                      </div>
+                      {msg.text.trim() && <p className="text-sm text-gray-800 leading-relaxed">{msg.text}</p>}
+                      {msg.attachment && (
+                        <div 
+                          onClick={() => handleFileClick(msg.attachment!.url, msg.attachment!.name)}
+                          className={`${msg.text.trim() ? 'mt-3' : ''} p-3 bg-indigo-50 rounded-lg flex items-center gap-3 cursor-pointer hover:bg-indigo-100 transition-colors`}
+                        >
+                          <div className="p-2 bg-indigo-100 rounded">
+                            <svg className="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{msg.attachment.name}</p>
+                            <p className="text-xs text-gray-500">{msg.attachment.size}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : msg.messageType === 'resource' && msg.sender === 'student' ? (
+                    // Resource message from student
+                    <div className="bg-white border-2 border-indigo-200 rounded-2xl px-4 py-3 mb-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <svg className="w-4 h-4 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">Resource</span>
+                      </div>
+                      {msg.text.trim() && <p className="text-sm text-gray-800 leading-relaxed">{msg.text}</p>}
+                      {msg.attachment && (
+                        <div 
+                          onClick={() => handleFileClick(msg.attachment!.url, msg.attachment!.name)}
+                          className={`${msg.text.trim() ? 'mt-3' : ''} p-3 bg-indigo-50 rounded-lg flex items-center gap-3 cursor-pointer hover:bg-indigo-100 transition-colors`}
+                        >
+                          <div className="p-2 bg-indigo-100 rounded">
+                            <svg className="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{msg.attachment.name}</p>
+                            <p className="text-xs text-gray-500">{msg.attachment.size}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // Regular message
+                    <div className={`rounded-2xl px-4 py-3 ${msg.sender === 'counselor' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                      {msg.text.trim() && <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>}
+                      {msg.attachment && (
+                        <div 
+                          onClick={() => handleFileClick(msg.attachment!.url, msg.attachment!.name)}
+                          className={`${msg.text.trim() ? 'mt-3' : ''} p-3 rounded-lg flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity ${msg.sender === 'counselor' ? 'bg-blue-400/30' : 'bg-white'}`}
+                        >
+                          <div className={`p-2 rounded ${msg.sender === 'counselor' ? 'bg-blue-400' : 'bg-red-100'}`}>
+                            <svg className={`w-5 h-5 ${msg.sender === 'counselor' ? 'text-white' : 'text-red-600'}`} fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium truncate ${msg.sender === 'counselor' ? 'text-white' : 'text-gray-900'}`}>
+                              {msg.attachment.name}
+                            </p>
+                            <p className={`text-xs ${msg.sender === 'counselor' ? 'text-blue-100' : 'text-gray-500'}`}>
+                              {msg.attachment.size}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <p className={`text-xs text-gray-500 mt-1 ${msg.sender === 'counselor' ? 'text-right' : 'text-left'}`}>
+                    {msg.senderName} • {new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input Area */}
+        <div className="px-6 py-4 border-t border-gray-200 flex-shrink-0 bg-white">
+          {/* Message Type Tabs */}
+          <div className="flex items-center gap-2 mb-3">
+            <button
+              onClick={() => setMessageType('normal')}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                messageType === 'normal'
+                  ? 'bg-blue-500 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              General
+            </button>
+            <button
+              onClick={() => setMessageType('feedback')}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                messageType === 'feedback'
+                  ? 'bg-blue-500 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Feedback
+            </button>
+            <button
+              onClick={() => setMessageType('action')}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                messageType === 'action'
+                  ? 'bg-blue-500 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Action
+            </button>
+            <button
+              onClick={() => setMessageType('resource')}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                messageType === 'resource'
+                  ? 'bg-blue-500 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Resource
+            </button>
+          </div>
+          {attachedFile && (
+            <div className="mb-3 p-3 bg-gray-50 rounded-lg flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded">
+                <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{attachedFile.name}</p>
+                <p className="text-xs text-gray-500">{(attachedFile.size / (1024 * 1024)).toFixed(1)} MB</p>
+              </div>
+              <button
+                onClick={() => setAttachedFile(null)}
+                className="p-1 hover:bg-gray-200 rounded"
+              >
+                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
+          <div className="flex items-end gap-3">
+            {/* Photos/Videos Upload Button */}
+            <button
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*,video/*';
+                input.onchange = (e) => {
+                  const file = (e.target as HTMLInputElement).files?.[0];
+                  if (file) setAttachedFile(file);
+                };
+                input.click();
+              }}
+              className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Attach photo or video"
+            >
+              <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </button>
+            {/* Files Upload Button */}
+            <button
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx';
+                input.onchange = (e) => {
+                  const file = (e.target as HTMLInputElement).files?.[0];
+                  if (file) setAttachedFile(file);
+                };
+                input.click();
+              }}
+              className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Attach file"
+            >
+              <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+            </button>
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              placeholder="Write structured feedback..."
+              className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+            />
+            <button
+              onClick={handleSendMessage}
+              disabled={!newMessage.trim() && !attachedFile}
+              className="p-2.5 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-full transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-2 text-center">Sending as "Advanced Counselor" mode</p>
+        </div>
+      </div>
+
+      {/* File Preview Modal */}
+      {previewFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75" onClick={() => setPreviewFile(null)}>
+          <div className="relative max-w-6xl max-h-[90vh] w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setPreviewFile(null)}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
+            >
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            
+            <div className="bg-white rounded-lg overflow-hidden">
+              <div className="p-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">{previewFile.name}</h3>
+              </div>
+              
+              <div className="p-4 max-h-[calc(90vh-100px)] overflow-auto">
+                {previewFile.type === 'image' && (
+                  <img src={previewFile.url} alt={previewFile.name} className="max-w-full h-auto mx-auto" />
+                )}
+                {previewFile.type === 'video' && (
+                  <video src={previewFile.url} controls className="max-w-full h-auto mx-auto" />
+                )}
+                {previewFile.type === 'pdf' && (
+                  <iframe src={previewFile.url} className="w-full h-[calc(90vh-150px)]" title={previewFile.name} />
+                )}
+                {previewFile.type === 'document' && (
+                  <div className="text-center py-12">
+                    <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                    </svg>
+                    <p className="text-gray-600 mb-4">Preview not available for this file type</p>
+                    <a
+                      href={previewFile.url}
+                      download={previewFile.name}
+                      className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    >
+                      <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Download File
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface AgentSuggestion {
   _id: string;
   title: string;
@@ -135,6 +640,7 @@ interface StudentActivity {
 
 function ActivitiesContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const studentIvyServiceId = searchParams.get('studentIvyServiceId');
   const counselorId = searchParams.get('counselorId') || '695b93a44df1114a001dc23d';
 
@@ -161,6 +667,22 @@ function ActivitiesContent() {
   const [activeTab, setActiveTab] = useState<'suggestions' | 'evaluate'>('suggestions');
   const [viewingFileUrl, setViewingFileUrl] = useState<string | null>(null);
   const [viewingCounselorDocUrl, setViewingCounselorDocUrl] = useState<string | null>(null);
+  const [selectedTask, setSelectedTask] = useState<{ activityTitle: string; task: DocumentTask; activityId: string } | null>(null);
+
+  // Update URL when conversation opens/closes
+  const handleTaskClick = (activityTitle: string, task: DocumentTask, activityId: string) => {
+    setSelectedTask({ activityTitle, task, activityId });
+    const params = new URLSearchParams(window.location.search);
+    params.set('conversationOpen', 'true');
+    router.push(`${window.location.pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const handleCloseConversation = () => {
+    setSelectedTask(null);
+    const params = new URLSearchParams(window.location.search);
+    params.delete('conversationOpen');
+    router.push(`${window.location.pathname}?${params.toString()}`, { scroll: false });
+  };
 
   const fetchStudentActivities = async () => {
     const studentId = searchParams.get('studentId');
@@ -517,8 +1039,14 @@ function ActivitiesContent() {
   const currentPointerSelectionCount = suggestions.filter(s => selectedActivities.has(s._id)).length;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-md p-8">
+    <div className="h-screen flex overflow-hidden bg-gray-50">
+      {/* Main Content - Tasks */}
+      <div 
+        className={`flex-1 overflow-y-auto transition-all duration-300 ${selectedTask ? 'w-[35%]' : 'w-full'}`}
+        style={{ maxWidth: selectedTask ? '35%' : '100%' }}
+      >
+        <div className="py-12 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-md p-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Activity Management</h1>
 
         {/* Tabs */}
@@ -804,7 +1332,7 @@ function ActivitiesContent() {
                       {/* Counselor Documents Upload Section */}
                       <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-md">
                         <div className="flex items-center justify-between mb-3">
-                          <p className="text-sm font-medium text-purple-900">Documents for Student</p>
+                          <p className="text-sm font-medium text-purple-900">Activity guides for Student</p>
                           <input
                             type="file"
                             id={`doc-upload-${activity.selectionId}`}
@@ -840,7 +1368,7 @@ function ActivitiesContent() {
                             onClick={() => document.getElementById(`doc-upload-${activity.selectionId}`)?.click()}
                             className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm font-medium"
                           >
-                            + Upload Document
+                            + Upload Guide
                           </button>
                         </div>
                         {activity.counselorDocuments && activity.counselorDocuments.length > 0 ? (
@@ -874,7 +1402,8 @@ function ActivitiesContent() {
                                       return (
                                         <div
                                           key={taskIdx}
-                                          className="flex items-start gap-2 p-2 rounded bg-gray-50 hover:bg-gray-100 transition-colors"
+                                          className="flex items-start gap-2 p-2 rounded bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+                                          onClick={() => handleTaskClick(activity.title, task, activity.selectionId)}
                                         >
                                           {task.status === 'completed' && (
                                             <div className="flex-shrink-0 mt-0.5">
@@ -963,7 +1492,7 @@ function ActivitiesContent() {
                             ))}
                           </div>
                         ) : (
-                          <p className="text-xs text-purple-700">No documents uploaded yet. Upload PDF or Word documents for students to view.</p>
+                          <p className="text-xs text-purple-700">No activity guides uploaded yet. Upload Word guides for students to view.</p>
                         )}
                       </div>
 
@@ -1026,6 +1555,22 @@ function ActivitiesContent() {
           </div>
         )}
       </div>
+    </div>
+      </div>
+    
+
+      {/* Conversation Window */}
+      {selectedTask && (
+        <div className="w-[65%] border-l border-gray-200 flex-shrink-0 overflow-hidden">
+          <ConversationWindow
+            activityTitle={selectedTask.activityTitle}
+            task={selectedTask.task}
+            activityId={selectedTask.activityId}
+            studentIvyServiceId={studentIvyServiceId!}
+            onClose={handleCloseConversation}
+          />
+        </div>
+      )}
     </div>
   );
 }

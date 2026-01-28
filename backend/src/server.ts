@@ -15,6 +15,7 @@ import pointerActivityRoutes from './routes/pointerActivity.routes';
 import pointer234ActivityRoutes from './routes/pointer234Activity.routes';
 import ivyScoreRoutes from './routes/ivyScore.routes';
 import adminRoutes from './routes/admin.routes';
+import taskConversationRoutes from './routes/taskConversation.routes';
 
 dotenv.config();
 
@@ -44,6 +45,7 @@ app.use('/api/pointer5', pointer5Routes);
 app.use('/api/pointer6', pointer6Routes);
 app.use('/api/pointer/activity', pointerActivityRoutes);
 app.use('/api/ivy-score', ivyScoreRoutes);
+app.use('/api/task', taskConversationRoutes);
 
 // TEMPORARY Maintenance Route
 app.get('/api/maintenance/drop-index', async (req, res) => {

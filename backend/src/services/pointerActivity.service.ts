@@ -98,8 +98,8 @@ export const selectActivities = async (
     throw new Error('agentSuggestionIds is required');
   }
 
-  // Validate weightages for Pointer 2
-  if (pointerNo === PointerNo.SpikeInOneArea) {
+  // Validate weightages for Pointers 2, 3, 4
+  if (pointerNo === PointerNo.SpikeInOneArea || pointerNo === PointerNo.LeadershipInitiative || pointerNo === PointerNo.GlobalSocialImpact) {
     if (agentSuggestionIds.length === 1) {
       // Auto-assign 100 for single activity
       weightages = [100];
@@ -186,8 +186,8 @@ export const selectActivities = async (
 
     if (existing) {
       existing.isVisibleToStudent = isVisibleToStudent;
-      // Update weightage for Pointer 2
-      if (pointerNo === PointerNo.SpikeInOneArea && weightages) {
+      // Update weightage for Pointers 2, 3, 4
+      if ((pointerNo === PointerNo.SpikeInOneArea || pointerNo === PointerNo.LeadershipInitiative || pointerNo === PointerNo.GlobalSocialImpact) && weightages) {
         const index = agentSuggestionIds.indexOf(agentSuggestionId);
         if (index !== -1 && weightages[index] !== undefined) {
           existing.weightage = weightages[index];
@@ -202,7 +202,7 @@ export const selectActivities = async (
         agentSuggestionId: ensureObjectId(agentSuggestionId, 'agentSuggestionId'),
         pointerNo,
         isVisibleToStudent,
-        ...(pointerNo === PointerNo.SpikeInOneArea && weightages && weightages[index] !== undefined 
+        ...((pointerNo === PointerNo.SpikeInOneArea || pointerNo === PointerNo.LeadershipInitiative || pointerNo === PointerNo.GlobalSocialImpact) && weightages && weightages[index] !== undefined 
           ? { weightage: weightages[index] } 
           : {}),
       });
