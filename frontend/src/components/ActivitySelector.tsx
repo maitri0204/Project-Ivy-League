@@ -93,11 +93,6 @@ export default function ActivitySelector({ pointerNo }: ActivitySelectorProps) {
                       📄 {activity.documentName}
                     </p>
                   )}
-                  {activity.source === 'SUPERADMIN' && (
-                    <span className="inline-block mt-1 text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded">
-                      Superadmin Activity
-                    </span>
-                  )}
                 </div>
                 {activity.documentUrl && (
                   <div className="text-blue-600">

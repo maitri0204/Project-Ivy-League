@@ -49,7 +49,7 @@ export default function AgentSuggestionsPage() {
       if (response.data.length === 0) {
         setMessage({
           type: 'error',
-          text: 'No suitable activities found. Please ensure Excel files have been uploaded for this pointer.',
+          text: 'No suitable activities found.',
         });
       }
     } catch (error: any) {

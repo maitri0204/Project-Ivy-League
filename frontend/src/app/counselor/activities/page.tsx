@@ -33,8 +33,47 @@ function InlineDocViewer({ url, onClose }: { url: string, onClose: () => void })
     }
   }, [fullUrl, isWord]);
 
+  useEffect(() => {
+    // Prevent right-click context menu
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      return false;
+    };
+
+    // Prevent keyboard shortcuts
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent Ctrl+C, Ctrl+S, Ctrl+P, Ctrl+A, Ctrl+X
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        (e.key === 'c' ||
+          e.key === 's' ||
+          e.key === 'p' ||
+          e.key === 'a' ||
+          e.key === 'x')
+      ) {
+        e.preventDefault();
+        return false;
+      }
+    };
+
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   return (
-    <div className="mt-4 relative bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border-4 border-gray-800 animate-in fade-in zoom-in-95 duration-300">
+    <div className="mt-4 relative bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border-4 border-gray-800 animate-in fade-in zoom-in-95 duration-300"
+      style={{
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        MozUserSelect: 'none',
+        msUserSelect: 'none',
+      }}
+    >
       <div className="absolute top-4 right-4 z-10">
         <button
           onClick={onClose}
@@ -610,6 +649,7 @@ interface AgentSuggestion {
   description: string;
   tags: string[];
   pointerNo: number;
+  source?: string;
 }
 
 interface StudentActivity {
@@ -826,7 +866,7 @@ function ActivitiesContent() {
       if (response.data.length === 0) {
         setMessage({
           type: 'error',
-          text: 'No suitable activities found. Please ensure Excel files have been uploaded for this pointer.',
+          text: 'No suitable activities found.',
         });
       }
     } catch (error: any) {
@@ -1329,47 +1369,10 @@ function ActivitiesContent() {
                         </p>
                       </div>
 
-                      {/* Counselor Documents Upload Section */}
+                      {/* Counselor Documents Section */}
                       <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-md">
                         <div className="flex items-center justify-between mb-3">
                           <p className="text-sm font-medium text-purple-900">Activity guides for Student</p>
-                          <input
-                            type="file"
-                            id={`doc-upload-${activity.selectionId}`}
-                            multiple
-                            accept=".pdf,.doc,.docx"
-                            className="hidden"
-                            onChange={async (e) => {
-                              const files = e.target.files;
-                              if (!files || files.length === 0) return;
-
-                              try {
-                                const formData = new FormData();
-                                Array.from(files).forEach(file => formData.append('counselorDocs', file));
-                                formData.append('selectionId', activity.selectionId);
-                                formData.append('counselorId', counselorId);
-
-                                const response = await axios.post(
-                                  'http://localhost:5000/api/pointer/activity/counselor/documents',
-                                  formData,
-                                  { headers: { 'Content-Type': 'multipart/form-data' } }
-                                );
-
-                                if (response.data.success) {
-                                  setMessage({ type: 'success', text: 'Documents uploaded successfully!' });
-                                  setTimeout(() => fetchStudentActivities(), 500);
-                                }
-                              } catch (error: any) {
-                                setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to upload documents' });
-                              }
-                            }}
-                          />
-                          <button
-                            onClick={() => document.getElementById(`doc-upload-${activity.selectionId}`)?.click()}
-                            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm font-medium"
-                          >
-                            + Upload Guide
-                          </button>
                         </div>
                         {activity.counselorDocuments && activity.counselorDocuments.length > 0 ? (
                           <div className="space-y-3">
@@ -1377,7 +1380,7 @@ function ActivitiesContent() {
                               <div key={docIdx} className="bg-white rounded-lg border border-purple-200 overflow-hidden">
                                 {/* Document Header */}
                                 <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-white border-b border-purple-100">
-                                  <span className="text-sm text-gray-800 font-semibold">📎 Document {docIdx + 1}</span>
+                                  <span className="text-sm text-gray-800 font-semibold">📎 Guide {docIdx + 1}</span>
                                   <button
                                     onClick={() => setViewingCounselorDocUrl(viewingCounselorDocUrl === doc.url ? null : doc.url)}
                                     className={`text-xs font-medium px-3 py-1.5 rounded-md ${viewingCounselorDocUrl === doc.url ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}`}

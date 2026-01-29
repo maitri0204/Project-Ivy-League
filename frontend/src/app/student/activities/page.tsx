@@ -1004,9 +1004,6 @@ function ActivitiesContent() {
                                     <p className="text-gray-600">Document preview not available</p>
                                   </div>
                                 )}
-                                <p className="text-xs text-indigo-700 mt-2 text-center">
-                                  View Only (Download & Copy Disabled)
-                                </p>
                               </div>
                             )}
                           </div>

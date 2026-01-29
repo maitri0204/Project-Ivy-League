@@ -56,8 +56,8 @@ export const createActivity = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // Save file to disk
-    const uploadDir = path.join(process.cwd(), 'uploads', 'activities');
+    // Save file to disk with pointer-wise folder structure
+    const uploadDir = path.join(process.cwd(), 'uploads', 'activities', pointer.toString());
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -71,9 +71,9 @@ export const createActivity = async (req: Request, res: Response): Promise<void>
       pointerNo: pointer,
       title: name,
       description: description,
-      tags: ['Superadmin Activity'],
+      tags: [],
       source: 'SUPERADMIN',
-      documentUrl: `/uploads/activities/${fileName}`,
+      documentUrl: `/uploads/activities/${pointer}/${fileName}`,
       documentName: req.file.originalname,
     });
 

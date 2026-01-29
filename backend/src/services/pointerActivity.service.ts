@@ -177,6 +177,11 @@ export const selectActivities = async (
     await refreshPointerAverageScore(service._id.toString(), pointerNo);
   }
 
+  // Create suggestion map before the loop
+  const suggestionMap = new Map(
+    suggestions.map((sug) => [sug._id.toString(), sug]),
+  );
+
   const updatedSelections: typeof existingSelections = [];
 
   for (const agentSuggestionId of agentSuggestionIds) {
@@ -197,11 +202,44 @@ export const selectActivities = async (
       updatedSelections.push(existing);
     } else {
       const index = agentSuggestionIds.indexOf(agentSuggestionId);
+      
+      // Check if this is a SUPERADMIN activity with a document
+      const suggestion = suggestionMap.get(agentSuggestionId);
+      let counselorDocuments: any[] = [];
+      
+      if (suggestion && suggestion.source === 'SUPERADMIN' && suggestion.documentUrl) {
+        // Extract TOC from the superadmin's document
+        try {
+          const fullPath = path.join(process.cwd(), suggestion.documentUrl);
+          const extractedTasks = await extractTOC(fullPath);
+          
+          counselorDocuments = [{
+            url: suggestion.documentUrl,
+            tasks: extractedTasks.map(task => ({
+              title: task.title,
+              page: task.page,
+              status: 'not-started' as const
+            }))
+          }];
+        } catch (error) {
+          console.error('Error extracting TOC for superadmin activity:', error);
+          // If extraction fails, create a default task
+          counselorDocuments = [{
+            url: suggestion.documentUrl,
+            tasks: [{
+              title: 'Complete Document Review',
+              status: 'not-started' as const
+            }]
+          }];
+        }
+      }
+      
       const created = await CounselorSelectedSuggestion.create({
         studentIvyServiceId: service._id,
         agentSuggestionId: ensureObjectId(agentSuggestionId, 'agentSuggestionId'),
         pointerNo,
         isVisibleToStudent,
+        counselorDocuments: counselorDocuments.length > 0 ? counselorDocuments : undefined,
         ...((pointerNo === PointerNo.SpikeInOneArea || pointerNo === PointerNo.LeadershipInitiative || pointerNo === PointerNo.GlobalSocialImpact) && weightages && weightages[index] !== undefined 
           ? { weightage: weightages[index] } 
           : {}),
@@ -209,11 +247,6 @@ export const selectActivities = async (
       updatedSelections.push(created);
     }
   }
-
-  // Map suggestions for response
-  const suggestionMap = new Map(
-    suggestions.map((sug) => [sug._id.toString(), sug]),
-  );
 
   return updatedSelections.map((sel) => ({
     selection: sel,

@@ -19,18 +19,6 @@ export default function AdminDashboard() {
                         </div>
                     </Link>
 
-                    <Link href="/admin/upload-excel" className="block group">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md hover:border-indigo-300 transition-all h-full">
-                            <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center mb-4 text-green-600">
-                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                </svg>
-                            </div>
-                            <h2 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-green-600">Upload Master Data</h2>
-                            <p className="text-gray-600 text-sm">Upload Excel files for Pointers 2, 3, and 4 activities.</p>
-                        </div>
-                    </Link>
-
                     <Link href="/admin/analytics" className="block group">
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md hover:border-indigo-300 transition-all h-full">
                             <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4 text-purple-600">
