@@ -890,7 +890,7 @@ function ActivitiesContent() {
                 {/* Counselor Documents with Tasks - View Only */}
                 {activity.counselorDocuments && activity.counselorDocuments.length > 0 && (
                   <div className="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-md">
-                    <p className="text-sm font-medium text-indigo-900 mb-3">📄 Guides & Tasks from Counselor</p>
+                    <p className="text-sm font-medium text-indigo-900 mb-3"> Guides & Tasks from Counselor</p>
                     <div className="space-y-4">
                       {activity.counselorDocuments.map((doc, docIdx) => {
                         const isPdf = doc.url.toLowerCase().endsWith('.pdf');

@@ -6,7 +6,9 @@ export interface IAgentSuggestion extends Document {
   title: string;
   description: string;
   tags: string[];
-  source: 'EXCEL';
+  source: 'EXCEL' | 'SUPERADMIN';
+  documentUrl?: string;
+  documentName?: string;
   createdAt?: Date;
 }
 
@@ -15,7 +17,9 @@ const agentSuggestionSchema = new Schema<IAgentSuggestion>({
   title: { type: String, required: true },
   description: { type: String, required: true },
   tags: [{ type: String }],
-  source: { type: String, enum: ['EXCEL'], required: true, default: 'EXCEL' },
+  source: { type: String, enum: ['EXCEL', 'SUPERADMIN'], required: true, default: 'EXCEL' },
+  documentUrl: { type: String },
+  documentName: { type: String },
   createdAt: { type: Date, default: Date.now },
 });
 

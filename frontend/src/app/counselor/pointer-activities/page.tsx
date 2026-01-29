@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, Suspense } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'next/navigation';
+import ActivitySelector from '@/components/ActivitySelector';
 
 interface AgentSuggestion {
   _id: string;
@@ -511,6 +512,13 @@ function CounselorPointerActivitiesContent() {
           {!studentIvyServiceId && (
             <p className="text-sm text-red-600">Enter studentIvyServiceId to view assignments.</p>
           )}
+
+          {/* Activity Selectors for each pointer */}
+          <div className="space-y-4">
+            <ActivitySelector pointerNo={2} />
+            <ActivitySelector pointerNo={3} />
+            <ActivitySelector pointerNo={4} />
+          </div>
 
           {loadingActivities && <p className="text-sm text-gray-500">Loading assignments...</p>}
 

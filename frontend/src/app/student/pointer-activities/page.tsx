@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, Suspense } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'next/navigation';
+import ActivitySelector from '@/components/ActivitySelector';
 
 interface ActivityRecord {
   selectionId: string;
@@ -183,6 +184,13 @@ function StudentPointerActivitiesContent() {
         {!studentIvyServiceId && (
           <p className="text-sm text-red-600">Enter studentIvyServiceId to load your tasks.</p>
         )}
+
+        {/* Activity Selectors for each pointer */}
+        <div className="space-y-4">
+          <ActivitySelector pointerNo={2} />
+          <ActivitySelector pointerNo={3} />
+          <ActivitySelector pointerNo={4} />
+        </div>
 
         {loading && <p className="text-sm text-gray-500">Loading assigned activities...</p>}
 
