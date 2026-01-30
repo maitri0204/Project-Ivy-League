@@ -229,7 +229,7 @@ export default function AdminAnalyticsDashboard() {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-center">
                                                 <div className={`text-sm font-bold ${getScoreColor(counselor.averageStudentScore)}`}>
-                                                    {counselor.averageStudentScore.toFixed(1)} <span className="text-gray-400 font-normal">/ 60</span>
+                                                    {counselor.averageStudentScore.toFixed(1)} <span className="text-gray-400 font-normal">/ 10</span>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">

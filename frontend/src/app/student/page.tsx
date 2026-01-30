@@ -118,7 +118,7 @@ function IvyScoreContent() {
 
     if (!scoreData) return null;
 
-    const totalMaxScore = 60;
+    const totalMaxScore = 10;
     const overallPercentage = (scoreData.overallScore / totalMaxScore) * 100;
 
     return (
@@ -232,7 +232,7 @@ function IvyScoreContent() {
                     <div>
                         <h4 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Understanding Your Profile</h4>
                         <p className="text-indigo-200/60 font-medium leading-relaxed max-w-3xl">
-                            Each pointer follows the Ivy League evaluation matrix scaled from 0-10. Your counselors manually verify your proofs to ensure accuracy. A score above 45/60 indicates high competitiveness for top-tier universities.
+                            Each pointer follows the Ivy League evaluation matrix scaled from 0-10. Your counselors manually verify your proofs to ensure accuracy. 
                         </p>
                     </div>
                 </div>

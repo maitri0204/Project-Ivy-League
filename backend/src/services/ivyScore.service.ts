@@ -6,7 +6,14 @@ import { PointerNo } from '../types/PointerNo';
 /**
  * Calculate and aggregate scores for a student
  * Each pointer: 0-10 scale
- * Total: Sum of all 6 pointers (max 60)
+ * Total: Weighted average out of 10 based on pointer importance
+ * Weightages:
+ * 1. Academic Excellence - 30%
+ * 2. Spike in one Area - 20%
+ * 3. Leadership & Initiative - 15%
+ * 4. Global or Social Impact - 10%
+ * 5. Authentic, Reflective Storytelling - 15%
+ * 6. Engagement with Learning & Intellectual Curiosity - 10%
  */
 export const calculateIvyScore = async (studentId: string) => {
     try {
@@ -31,6 +38,16 @@ export const calculateIvyScore = async (studentId: string) => {
             PointerNo.AuthenticStorytelling,
             PointerNo.IntellectualCuriosity,
         ];
+
+        // Define weightages for each pointer (total = 100%)
+        const pointerWeightages = new Map<PointerNo, number>([
+            [PointerNo.AcademicExcellence, 30],        // 30%
+            [PointerNo.SpikeInOneArea, 20],            // 20%
+            [PointerNo.LeadershipInitiative, 15],      // 15%
+            [PointerNo.GlobalSocialImpact, 10],        // 10%
+            [PointerNo.AuthenticStorytelling, 15],     // 15%
+            [PointerNo.IntellectualCuriosity, 10],     // 10%
+        ]);
 
         const scoreMap = new Map<PointerNo, { score: number; maxScore: number }>();
 
@@ -59,8 +76,13 @@ export const calculateIvyScore = async (studentId: string) => {
             };
         });
 
-        // Calculate total score (sum of all 6 pointers)
-        const totalScore = formattedScores.reduce((sum, ps) => sum + ps.score, 0);
+        // Calculate weighted total score (out of 10)
+        // Formula: (weightage/100) × score for each pointer
+        let totalScore = 0;
+        formattedScores.forEach(ps => {
+            const weightage = pointerWeightages.get(ps.pointerNo) || 0;
+            totalScore += (weightage / 100) * ps.score;
+        });
 
         // Update or create scorecard
         const scoreCard = await StudentIvyScoreCard.findOneAndUpdate(
