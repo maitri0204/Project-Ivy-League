@@ -248,6 +248,11 @@ export const selectActivities = async (
     }
   }
 
+  // Recalculate scores when weightages are updated for Pointers 2, 3, 4
+  if ((pointerNo === PointerNo.SpikeInOneArea || pointerNo === PointerNo.LeadershipInitiative || pointerNo === PointerNo.GlobalSocialImpact) && weightages) {
+    await refreshPointerAverageScore(service._id.toString(), pointerNo);
+  }
+
   return updatedSelections.map((sel) => ({
     selection: sel,
     suggestion: suggestionMap.get(sel.agentSuggestionId.toString())!,
@@ -377,22 +382,63 @@ export const evaluateActivity = async (
 
 /**
  * Recalculates the average score for a given pointer and updates the Ivy ready score.
+ * For pointers 2, 3, 4: Uses weighted average based on activity weightage.
  */
 const refreshPointerAverageScore = async (studentIvyServiceId: string, pointerNo: number) => {
+  // Get all selections for this student and pointer to access weightage
+  const selections = await CounselorSelectedSuggestion.find({
+    studentIvyServiceId: ensureObjectId(studentIvyServiceId, 'studentIvyServiceId'),
+    pointerNo: Number(pointerNo)
+  });
+
+  // Get all submissions for this student
   const studentSubmissions = await StudentSubmission.find({
     studentIvyServiceId: ensureObjectId(studentIvyServiceId, 'studentIvyServiceId')
   });
-  const submissionIds = studentSubmissions.map(s => s._id);
 
+  // Create a map of selection ID to weightage
+  const selectionWeightageMap = new Map(
+    selections.map(sel => [sel._id.toString(), sel.weightage || 0])
+  );
+
+  // Get evaluations and their corresponding submissions to link weightages
+  const submissionIds = studentSubmissions.map(s => s._id);
   const evaluations = await CounselorEvaluation.find({
     studentSubmissionId: { $in: submissionIds },
     pointerNo: Number(pointerNo)
   });
 
   let averageScore = 0;
+  
   if (evaluations.length > 0) {
-    const totalScore = evaluations.reduce((sum, ev) => sum + ev.score, 0);
-    averageScore = totalScore / evaluations.length;
+    // Create a map of submission ID to selection ID
+    const submissionToSelectionMap = new Map(
+      studentSubmissions.map(sub => [sub._id.toString(), sub.counselorSelectedSuggestionId.toString()])
+    );
+
+    // Calculate weighted average
+    let totalWeightedScore = 0;
+    let totalWeightage = 0;
+
+    for (const evaluation of evaluations) {
+      const selectionId = submissionToSelectionMap.get(evaluation.studentSubmissionId.toString());
+      if (selectionId) {
+        const weightage = selectionWeightageMap.get(selectionId) || 0;
+        if (weightage > 0) {
+          totalWeightedScore += (weightage / 100) * evaluation.score;
+          totalWeightage += weightage;
+        }
+      }
+    }
+
+    // Use weighted average if weightages exist, otherwise fall back to simple average
+    if (totalWeightage > 0) {
+      averageScore = totalWeightedScore;
+    } else {
+      // Fallback to simple average if no weightages are set
+      const totalScore = evaluations.reduce((sum, ev) => sum + ev.score, 0);
+      averageScore = totalScore / evaluations.length;
+    }
   }
 
   await updateScoreAfterEvaluation(

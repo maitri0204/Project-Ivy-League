@@ -252,25 +252,27 @@ function StudentPointerActivitiesContent() {
                 </div>
               )}
 
-              <div className="border border-gray-200 rounded-md p-3 space-y-3">
-                <p className="text-sm font-semibold text-gray-900">Upload / replace proof</p>
-                <textarea
-                  rows={2}
-                  value={remarksDraft[act.selectionId] ?? ''}
-                  onChange={(e) => setRemarksDraft((prev) => ({ ...prev, [act.selectionId]: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
-                  placeholder="Add remarks (optional)"
-                  disabled={uploadingFor === act.selectionId}
-                />
-                <input
-                  type="file"
-                  multiple
-                  onChange={(e) => handleUpload(act.selectionId, e.target.files)}
-                  disabled={uploadingFor === act.selectionId}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
-                />
-                <p className="text-xs text-gray-500">Upload PDFs or images. Re-upload to replace previous files.</p>
-              </div>
+              {!act.submission && (
+                <div className="border border-gray-200 rounded-md p-3 space-y-3">
+                  <p className="text-sm font-semibold text-gray-900">Upload proof</p>
+                  <textarea
+                    rows={2}
+                    value={remarksDraft[act.selectionId] ?? ''}
+                    onChange={(e) => setRemarksDraft((prev) => ({ ...prev, [act.selectionId]: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
+                    placeholder="Add remarks (optional)"
+                    disabled={uploadingFor === act.selectionId}
+                  />
+                  <input
+                    type="file"
+                    multiple
+                    onChange={(e) => handleUpload(act.selectionId, e.target.files)}
+                    disabled={uploadingFor === act.selectionId}
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
+                  />
+                  <p className="text-xs text-gray-500">Upload PDFs or images.</p>
+                </div>
+              )}
 
               {act.evaluation && (
                 <div className="bg-green-50 border border-green-200 rounded-md p-3 space-y-2">

@@ -172,9 +172,6 @@ export default function CounselorDashboard() {
             <div className="p-8 md:p-12 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-1000">
                 {/* Header */}
                 <header className="mb-16">
-                    <div className="inline-block px-4 py-1.5 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-full mb-6 tracking-[0.3em] uppercase border border-indigo-100">
-                        Student Performance Overview
-                    </div>
                     <h1 className="text-6xl font-black text-gray-900 tracking-tighter mb-4 leading-tight">
                         {selectedStudent?.studentId.name || 'Student'}'s<br />
                         <span className="text-indigo-600">Ivy League Readiness</span>
